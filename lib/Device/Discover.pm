@@ -4,9 +4,24 @@ use 5.006;
 use strict;
 use warnings FATAL => 'all';
 
+use Carp;
+
+use Params::Validate qw( validate SCALAR UNDEF );
+use IO::Socket::INET;
+use Net::SNMP;
+
+# For checking management protocol
+
+use Net::OpenSSH;
+use Net::Telnet;
+
+use List::MoreUtils qw (any firstval);
+
+use Data::Dumper;
+
 =head1 NAME
 
-Device::Discover - The great new Device::Discover!
+Device::Discover - Network device discovery module.
 
 =head1 VERSION
 
@@ -19,35 +34,458 @@ our $VERSION = '0.01';
 
 =head1 SYNOPSIS
 
-Quick summary of what the module does.
+Device discovery module. Get's device managment protocol, either ssh or telnet
+and discoveres the software running on the device using SNMP sysDesc.
 
-Perhaps a little code snippet.
+	use Device::Discover;
 
-    use Device::Discover;
+	my $name = '192.168.1.1';
 
-    my $foo = Device::Discover->new();
-    ...
+	$device = Device::Discover->new(hostname		=> $name,
+										 ssh_os_ignore	=> 'VRP,OneOS',
+										 community		=> 'public',
+										 snmptimeout	=> 1,
+										 snmpversion	=> 2,
+										 debug			=> 1);
 
-=head1 EXPORT
+	my $d = $device->discover;
 
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
+	if ($device->has_error) {
+		print STDERR "ERROR: " . $device->errormsg . ".\n";
+	} else {
+		print $d->{'hostname'} . "\n";
+		print $d->{'software'} . "\n";
+		print $d->{'protocol'} . "\n";
+	}
+
+	...
 
 =head1 SUBROUTINES/METHODS
 
-=head2 function1
+=head2 new
+
+Creates new Net::Device Discover::Object.
+
+	$device = Device::Discover->new(
+										hostname		=> $hostname,
+										[software		=> $software,]
+										[protocol		=> $protocol,]
+										[ssh_os_ignore	=> $ssh_os_ignore,]
+										[snmpversion	=> $snmpversion,]
+										[community		=> $community,]
+										[snmpusername	=> $snmpusername,]
+										[snmppassword	=> $snmppassword,]
+										[snmptimeout	=> $snmptimeout,]
+										[debug			=> $debug]
+										);
+
+This is the constructor for Device::Discover A new object is
+returned on success.
+
+The first parameter, or "hostname" argument, is required.
+
+One of the software, community or snmpusername/snmppassword arguments
+must be passed. If you set software then no SNMP discovery of
+the software running on the device will be done. If you want to discover
+the device software then set the community argument or the
+snmpusername/snmppassword arguments. Setting both will have the same
+effect as just passing the software argument without a community or
+snmpusername/snmppassword arguments.
+
+If the protocol argument is set then no discovery of the CLI managment
+protocol will be done.
+
+It makes no sense to set the protocol and software arguments, if you
+already know both of these you don't need this module.
+
+snmpversion by default is set to 2 for snmp v2c. If you set this to 2
+then you only need pass the community argument. For version 3 you must
+give the snmpusername and snmppasswords.
+
+snmptimeout defaults to 1 second.
+
+ssh_os_ignore argument takes a comma seperated string os software names
+to ignore when checking for SSH. This saves time when you know certain
+software running on devices is not capable of running ssh but might allow
+connections on the ssh port (only to send an error back down the connection.)
 
 =cut
 
-sub function1 {
+sub new {
+	my $class = shift;
+	my %options = @_;
+
+	my $self = {
+		has_err => 0,
+		errormsg => undef,
+		result => {},
+		options => {}
+	};
+	bless($self, $class);
+
+	$self->{'options'} = $self->_init(%options);
+
+	#print Dumper $self;
+
+	return($self);
 }
 
-=head2 function2
+
+=head2 get_management_protocol
+
+Get's the devices managment protocol, either SSH or Telnet. Returns 0 if
+the device does not have telnet or SSH port open or the device closes
+the connection once connected.
 
 =cut
 
-sub function2 {
+sub get_management_protocol {
+
+	my $self = shift;
+
+	return 'SSH' if $self->_check_ssh;
+	return 'TELNET' if $self->_check_telnet;
+
+	# Set error message and include the current error from the underlying
+	# managment protocol check.
+
+	$self->_set_errormsg (sprintf ("[%s] [%s] [Failed to discover CLI managment protocol.] [%s]", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $self->{'errormsg'}));
+
+	return 0;
 }
+
+=head2 parse_sysdesc
+
+Parse SNMP sysDesc string from SNMP and get the OS running on the device.
+
+=cut
+
+sub parse_sysdesc {
+
+	my $self = shift;
+
+	my $descr = $self->{'result'}->{'sysdesc'};
+
+	return 'JunOSe'		if ( $descr =~ m/ERX/);
+	return 'OneOS'		if ( $descr =~ m/ONEOS/);
+	return 'JunOS'		if ( $descr =~ m/Juniper/);
+	return 'EOS'		if ( $descr =~ m/Arista Networks/);
+	return 'VRP'		if ( $descr =~ m/Huawei/);
+	return 'IOS-XE'		if ( $descr =~ m/IOS-XE/ );
+	return 'IOS-XR'		if ( $descr =~ m/IOS XR/ );
+	return 'IOS'		if ( $descr =~ m/IOS/ );
+	return 'CatOS'		if ( $descr =~ m/catalyst/i );
+	return 'css'		if ( $descr =~ m/Content Switch SW/ );
+	return 'css-sca'	if ( $descr =~ m/Cisco Systems Inc CSS-SCA-/ );
+	return 'pix'		if ( $descr =~ m/Cisco PIX Security Appliance/ );
+	return 'asa'		if ( $descr =~ m/Cisco Adaptive Security Appliance/ );
+	return 'san-os'		if ( $descr =~ m/Cisco SAN-OS/ );
+
+	$self->_set_errormsg (sprintf ("[%s] [Unable to discover software running on device.]", $self->{'result'}->{'hostname'}));
+	return 0;
+}
+
+=head2 get_sysdesc
+
+Connects to device with snmp and gets sysDesc and lldpDesc.
+
+=cut
+
+sub get_sysdesc {
+
+	my $self = shift;
+
+	my $sysDesc	  = '1.3.6.1.2.1.1.1.0';
+	my $lldpDesc  = '1.0.8802.1.1.2.1.3.4.0';
+	my $session;
+	my $error;
+
+	if ($self->{'options'}->{'snmpversion'} == 3) {
+		($session, $error) = Net::SNMP->session(	Hostname => $self->{'options'}->{'hostname'},
+													Version => $self->{'options'}->{'snmpversion'},
+													Username => $self->{'options'}->{'snmpusername'},
+													Authpassword => $self->{'options'}->{'snmppassword'},
+													Timeout => $self->{'options'}->{'snmptimeout'});
+	} else {
+		($session, $error) = Net::SNMP->session(	Hostname => $self->{'options'}->{'hostname'},
+													Version => $self->{'options'}->{'snmpversion'},
+													Community => $self->{'options'}->{'community'},
+													Timeout => $self->{'options'}->{'snmptimeout'});
+	}
+
+	if (defined $session) {
+		my $result = $session->get_request( Varbindlist => [$sysDesc, $lldpDesc]);
+
+		if (defined($result)) {
+			$session->close;
+
+			my $line = $result->{$sysDesc} . " " . $result->{$lldpDesc};
+
+			$self->{'result'}->{'sysdesc'} = $line;
+			$line =~ s/\r|\n/ /g;
+			printf ("DEBUG:	 [Device::Discover] [SNMP] [%s] [%s]\n", $self->{'result'}->{'hostname'}, $line) if $self->{'options'}->{'debug'};
+
+			return 1;
+		} else {
+			$self->_set_errormsg (sprintf ("[%s] [SNMP] [%s]", $self->{'result'}->{'hostname'}, $session->error));
+		}
+		$session->close;
+	} else {
+		$self->_set_errormsg (sprintf ("[%s] [SNMP] [%s]", $self->{'result'}->{'hostname'}, $error));
+	}
+	return 0;
+}
+
+=head2 discover
+
+Discovers the device. If software isn't given as an argument it will
+connect via SNMP to get the device software.
+
+Returns a reference to the results hash with the device name/ip,
+software, SNMP sysDesc and managment protocol.
+
+=cut
+
+sub discover {
+
+	my $self = shift;
+
+	my $hostname = $self->{'result'}->{'hostname'};
+
+	unless (defined $self->{'options'}->{'software'}) {
+
+		unless ($self->get_sysdesc()) {
+			$self->{'has_error'} = 1;
+			return 0;
+		};
+
+		if (my $software = $self->parse_sysdesc()) {
+			printf ("Device::Discover DEBUG: [%s] [Discovered device is running %s as it's software.]\n", $self->{'result'}->{'hostname'}, $software) if $self->{'options'}->{'debug'};
+			$self->{'result'}->{'software'} = $software;
+		} else {
+			$self->{'has_error'} = 1;
+			return 0;
+		}
+	} else {
+		$self->{'result'}->{'software'} = $self->{'options'}->{'software'};
+	}
+
+	unless (defined $self->{'options'}->{'protocol'}) {
+
+		if (my $protocol = $self->get_management_protocol()) {
+			$self->{'result'}->{'protocol'} = $protocol;
+		} else {
+			$self->{'has_error'} = 1;
+			return 0;
+		}
+	} else {
+		$self->{'result'}->{'protocol'} = $self->{'options'}->{'protocol'};
+	}
+
+	return $self->{'result'};
+}
+
+=head2 has_error
+
+Returns if the object has an error.
+
+=cut
+
+sub has_error {
+	my $self = shift;
+
+	return $self->{'has_error'};
+}
+
+=head2 errormsg
+
+Returns the last error message. Use has_error to check if a device
+has an error, relying on this to return an empty string to check for
+errors might produce unexpected results (sometimes non fatal error
+messages can be stored here.)
+
+=cut
+
+sub errormsg {
+	my $self = shift;
+	return $self->{'errormsg'};
+}
+
+=head1 INTERNAL METHODS
+
+These methods should not be called directly but are used internally
+by the module.
+
+=head2 _init
+
+init function to validate arguments, not called directly.
+
+=cut
+
+sub _init {
+	my $self = shift;
+
+	my %p = validate(
+		@_, {
+				hostname => {
+					type	=> SCALAR
+				},
+				software => {
+					type	=> SCALAR,
+					optional => 1,
+					default => undef,
+				},
+				protocol => {
+					type	=> SCALAR,
+					optional => 1,
+				},
+				ssh_os_ignore => {
+					type => SCALAR | UNDEF,
+					optional => 1
+				},
+				community => {
+					type	=> SCALAR,
+					optional => 1,
+				},
+				snmpversion => {
+					type	=> SCALAR,
+					default => 2,
+					optional => 1,
+				},
+				snmpusername => {
+					type	=> SCALAR | UNDEF,
+					optional => 1,
+					depends	 => ['snmppassword']
+				},
+				snmppassword => {
+					type	=> SCALAR | UNDEF,
+					optional => 1,
+					depends	 => ['snmpusername'],
+				},
+				snmptimeout => {
+					type	=> SCALAR,
+					default => 1
+				},
+				debug => {
+					type	=> SCALAR | UNDEF,
+					default => 0
+				},
+
+		}
+	);
+
+	if (not defined $p{'software'}) {
+		if ($p{'snmpversion'} == 2 and not defined $p{'community'}) {
+			croak "Device::Discover, community argument must be passed when snmpversion argument set to 2 (default) and no software argument passed.";
+		}
+
+		if ($p{'snmpversion'} == 3 and (not defined $p{'snmpusername'} or not defined $p{'snmppassword'})) {
+			croak "Device::Discover, snmpusername and snmppassword arguments must be passed (and not undef) when snmpversion argument set to 3 and no software argument passed.";
+		}
+
+	}
+
+	if (defined $p{'software'} and defined $p{'protocol'}) {
+		croak "Device::Discover, passing the software and protocol arguments just adds overhead to your script, there's nothing to discover if you know these already.";
+	}
+
+	$self->{'result'}->{'hostname'} = $p{hostname};
+
+	return \%p;
+}
+
+
+=head2 _set_errormsg
+
+Accepts string as first agrument and set's it to be the current
+error message. Does not set has_error here as we might not want
+an error message to cause a failure. i.e a device can fail an ssh
+connection but will pass with telnet.
+
+=cut
+
+sub _set_errormsg {
+
+	my $self = shift;
+	my $errormsg = shift;
+
+	$self->{'errormsg'} = $errormsg;
+
+	return 1;
+}
+
+=head2 _check_ssh
+
+Checks if SSH is available on device.
+
+If ssh_os_ignore is set and software is already discovered or set in
+options then software is checked against ignore array to determine
+if ssh should be ignored for this device.
+
+=cut
+
+sub _check_ssh {
+	my $self = shift;
+
+	# Check if SSH should be ignored.
+	#
+	if (defined $self->{'result'}->{'software'} and defined $self->{'options'}->{'ssh_os_ignore'} and any {$self->{'result'}->{'software'} eq $_} (split ',', $self->{'options'}->{'ssh_os_ignore'})) {
+		printf ("DEBUG:	 [Device::Discover] [%s] [%s] [Ignoring SSH for this device.]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
+		return 0;
+	}
+	
+	my $ssh = Net::OpenSSH->new($self->{'result'}->{'hostname'});
+
+	# Check for error and if not return true otherwise set the error
+	# message from Net::OpenSSH
+	#
+	unless ($ssh->error) {
+		printf ("DEBUG:	 [Device::Discover] [%s] [%s] [Found SSH for this devices CLI managment protocol.]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
+		$ssh->disconnect;
+		return 1;
+	} else {
+		printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $ssh->error) if $self->{'options'}->{'debug'};
+		$self->_set_errormsg ($ssh->error); # Do we need to do this, telnet should throw a better error?
+	}
+
+	return 0;
+
+}
+
+=head2 _check_telnet
+
+Checks if Telnet is available on device.
+
+=cut
+
+sub _check_telnet {
+
+	my $self = shift;
+
+	# Create new telnet object
+
+	my $telnet = new Net::Telnet (Timeout => 4, Errmode => 'return');
+
+	# Try to open the connection
+
+	$telnet->open (Host => $self->{'result'}->{'hostname'});
+
+	# Check for error and if not return true otherwise set the error
+	# message from Net::Telnet
+
+	unless ($telnet->errmsg) {
+		printf ("DEBUG:	 [Device::Discover] [%s] [%s] [Found Telnet for this devices CLI managment protocol.]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
+		$telnet->close;
+		return 1;
+	} else {
+		printf ("DEBUG:	 [Device::Discover] [Telnet Check] [%s] [%s] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $telnet->errmsg) if $self->{'options'}->{'debug'};
+		$self->_set_errormsg ($telnet->errmsg);
+	}
+
+	return 0;
+
+}
+
 
 =head1 AUTHOR
 
@@ -55,8 +493,8 @@ Rob Woodward, C<< <robwwd at gmail.com> >>
 
 =head1 BUGS
 
-Please report any bugs or feature requests to C<bug-device-discover at rt.cpan.org>, or through
-the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Device-Discover>.  I will be notified, and then you'll
+Please report any bugs or feature requests to C<bug-net-device-discover at rt.cpan.org>, or through
+the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Net-Device-Discover>.	 I will be notified, and then you'll
 automatically be notified of progress on your bug as I make changes.
 
 
@@ -66,7 +504,7 @@ automatically be notified of progress on your bug as I make changes.
 
 You can find documentation for this module with the perldoc command.
 
-    perldoc Device::Discover
+	perldoc Device::Discover
 
 
 You can also look for information at:
@@ -75,19 +513,19 @@ You can also look for information at:
 
 =item * RT: CPAN's request tracker (report bugs here)
 
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=Device-Discover>
+L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=Net-Device-Discover>
 
 =item * AnnoCPAN: Annotated CPAN documentation
 
-L<http://annocpan.org/dist/Device-Discover>
+L<http://annocpan.org/dist/Net-Device-Discover>
 
 =item * CPAN Ratings
 
-L<http://cpanratings.perl.org/d/Device-Discover>
+L<http://cpanratings.perl.org/d/Net-Device-Discover>
 
 =item * Search CPAN
 
-L<http://search.cpan.org/dist/Device-Discover/>
+L<http://search.cpan.org/dist/Net-Device-Discover/>
 
 =back
 
