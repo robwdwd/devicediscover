@@ -12,7 +12,7 @@ use Net::SNMP;
 
 # For checking management protocol
 
-use Net::OpenSSH;
+use Net::SSH2;
 use Net::Telnet;
 
 use List::MoreUtils qw (any firstval);
@@ -434,18 +434,18 @@ sub _check_ssh {
 		return 0;
 	}
 	
-	my $ssh = Net::OpenSSH->new($self->{'result'}->{'hostname'});
+	my $ssh2 = Net::SSH2->new();
 
 	# Check for error and if not return true otherwise set the error
-	# message from Net::OpenSSH
+	# message from Net::SSH2
 	#
-	unless ($ssh->error) {
-		printf ("DEBUG:	 [Device::Discover] [%s] [%s] [Found SSH for this devices CLI managment protocol.]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
-		$ssh->disconnect;
+	if (my $sock = $ssh2->connect($self->{'result'}->{'hostname'}, 22, Timeout => 4)) {
+		printf ("DEBUG:	 [Net::Device::Discover] [%s] [%s] [Found SSH for this devices CLI managment protocol.]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
+		$ssh2->disconnect;
 		return 1;
 	} else {
-		printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $ssh->error) if $self->{'options'}->{'debug'};
-		$self->_set_errormsg ($ssh->error); # Do we need to do this, telnet should throw a better error?
+		printf ("DEBUG:	 [Net::Device::Discover] [SSH Check] [%s] [%s] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $!) if $self->{'options'}->{'debug'};
+		$self->_set_errormsg ($!); # Do we need to do this, telnet should throw a better error?
 	}
 
 	return 0;
