@@ -142,6 +142,11 @@ the connection once connected.
 sub get_management_protocol {
 
 	my $self = shift;
+	
+	my $ip_addr = inet_aton $self->{'result'}->{'hostname'} or do {
+		$self->_set_errormsg (sprintf ("[%s] [%s] [Failed to discover CLI managment protocol.] [Unknown hostname or IP address.]", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}));
+		return 0;
+	}
 
 	return 'SSH' if $self->_check_ssh;
 	return 'TELNET' if $self->_check_telnet;
@@ -424,6 +429,38 @@ if ssh should be ignored for this device.
 
 =cut
 
+sub _read_version_line {
+    my $ssh = shift;
+    my $sock = $ssh->{session}{sock};
+    my $line;
+    for(;;) {
+        my $s = IO::Select->new($sock);
+        my @ready = $s->can_read;
+        my $buf;
+        my $len = sysread($sock, $buf, 1);
+        unless(defined($len)) {
+            next if $! == EAGAIN || $! == EWOULDBLOCK;
+            croak "Read from socket failed: $!";
+        }
+        croak "Connection closed by remote host" if $len == 0;
+        $line .= $buf;
+        croak "Version line too long: $line"
+         if substr($line, 0, 4) eq "SSH-" and length($line) > 255;
+        croak "Pre-version line too long: $line" if length($line) > 4*1024;
+        return $line if $buf eq "\n";
+    }
+}
+
+sub _read_version {
+    my $ssh = shift;
+    my $line;
+    do {
+        $line = $ssh->_read_version_line;
+    } while (substr($line, 0, 4) ne "SSH-");
+    $ssh->debug("Remote version string: $line");
+    return $line;
+}
+
 sub _check_ssh {
 	my $self = shift;
 
@@ -434,19 +471,54 @@ sub _check_ssh {
 		return 0;
 	}
 	
-	my $ssh2 = Net::SSH2->new();
-
-	# Check for error and if not return true otherwise set the error
-	# message from Net::SSH2
-	#
-	if (my $sock = $ssh2->connect($self->{'result'}->{'hostname'}, 22, Timeout => 4)) {
-		printf ("DEBUG:	 [Net::Device::Discover] [%s] [%s] [Found SSH for this devices CLI managment protocol.]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
-		$ssh2->disconnect;
-		return 1;
-	} else {
+	my $buf;
+	
+	$sock = IO::Socket::INET->new(	PeerAddr => $self->{'result'}->{'hostname'},
+									PeerPort => 22,
+									Proto    => 'tcp',
+									Timeout => 4);
+									
+	unless ($sock) {
 		printf ("DEBUG:	 [Net::Device::Discover] [SSH Check] [%s] [%s] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $!) if $self->{'options'}->{'debug'};
-		$self->_set_errormsg ($!); # Do we need to do this, telnet should throw a better error?
+		$self->_set_errormsg ($!); 
+		return 0;
 	}
+	
+	my $remote_id = $ssh->_read_version;
+    ($ssh->{server_version_string} = $remote_id) =~ s/\cM?\n$//;
+    my($remote_major, $remote_minor, $remote_version) = $remote_id =~
+        /^SSH-(\d+)\.(\d+)-([^\n]+)\n$/;
+    $ssh->debug("Remote protocol version $remote_major.$remote_minor, remote software version $remote_version");
+	
+	$sock->sockopt(SO_LINGER, pack('SS', 0, 0));
+	
+	my $bytes_read = $sock->sysread($buf, 1024);
+
+	if (not defined $bytes_read) {
+		printf ("DEBUG:	 [Net::Device::Discover] [SSH Check] [%s] [%s] [Socket Error]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
+		$self->_set_errormsg ("Socket Error"); 
+	} elsif ($bytes_read == 0) {
+		printf ("DEBUG:	 [Net::Device::Discover] [SSH Check] [%s] [%s] [Remote host closed connection]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
+		$self->_set_errormsg ("Remote host closed connection"); 
+	} else {
+		$sock->close;
+		return 1;
+	}
+	
+	
+	# my $ssh2 = Net::SSH2->new();
+
+	# # Check for error and if not return true otherwise set the error
+	# # message from Net::SSH2
+	# #
+	# if (my $sock = $ssh2->connect($self->{'result'}->{'hostname'}, 22, Timeout => 4)) {
+		# printf ("DEBUG:	 [Net::Device::Discover] [%s] [%s] [Found SSH for this devices CLI managment protocol.]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
+		# $ssh2->disconnect;
+		# return 1;
+	# } else {
+		# printf ("DEBUG:	 [Net::Device::Discover] [SSH Check] [%s] [%s] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $!) if $self->{'options'}->{'debug'};
+		# $self->_set_errormsg ($!); # Do we need to do this, telnet should throw a better error?
+	# }
 
 	return 0;
 
