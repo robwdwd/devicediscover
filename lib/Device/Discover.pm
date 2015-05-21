@@ -503,7 +503,7 @@ sub _check_ssh {
     
     my $buf;
         
-    my $bytes_read = sysread($sock, $buf, 20);
+    my $bytes_read = sysread($sock, $buf, 8192);
     
     print STDERR "BUFF: $buf\n";
     
