@@ -497,10 +497,13 @@ sub _check_ssh {
     my ($remote_major, $remote_minor, $remote_version) = $line =~ /^SSH-(\d+)\.(\d+)-([^\n]+)$/;
     
     printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] Remote protocol version %s.%s, remote software version %s\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $remote_major, $remote_minor, $remote_version) if $self->{'options'}->{'debug'};
+ 
     
     syswrite $sock, $line . "\n";
     
     my $buf;
+    
+    sleep (1);
     
     my $bytes_read = sysread($sock, $buf, 1);
     
