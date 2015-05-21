@@ -502,21 +502,19 @@ sub _check_ssh {
     syswrite $sock, $line . "\n";
     
     my $buf;
-    
-    sleep (1);
-    
-    my $bytes_read = sysread($sock, $buf, 1);
+        
+    my $bytes_read = sysread($sock, $buf, 20);
     
     print STDERR "BUFF: $buf\n";
     
     if (not defined $bytes_read) {
-				printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [Socket Error] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $!) if $self->{'options'}->{'debug'};
-				$self->_set_errormsg ("Socket Error:" . $!);
-				return 0;
+		printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [Socket Error] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $!) if $self->{'options'}->{'debug'};
+		$self->_set_errormsg ("Socket Error:" . $!);
+		return 0;
 	} elsif ($bytes_read == 0) {
-				printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [Remote host closed connection]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
-				$self->_set_errormsg ("Remote host closed connection");
-				return 0;
+		printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [Remote host closed connection]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
+		$self->_set_errormsg ("Remote host closed connection");
+		return 0;
 	}
 	
 	printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] Found SSH running on this device.\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
