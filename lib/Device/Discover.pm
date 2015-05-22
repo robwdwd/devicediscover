@@ -10,9 +10,6 @@ use Carp;
 
 use Params::Validate qw( validate SCALAR UNDEF );
 use IO::Socket::INET;
-use Net::SNMP;
-
-use Net::CLI::Interact;
 
 use List::MoreUtils qw (any firstval);
 
@@ -196,7 +193,9 @@ Connects to device with snmp and gets sysDesc and lldpDesc.
 =cut
 
 sub get_sysdesc {
-
+	
+	use Net::SNMP;
+	
 	my $self = shift;
 
 	my $sysDesc	  = '1.3.6.1.2.1.1.1.0';
