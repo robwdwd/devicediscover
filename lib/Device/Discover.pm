@@ -12,6 +12,8 @@ use Params::Validate qw( validate SCALAR UNDEF );
 use IO::Socket::INET;
 use Net::SNMP;
 
+use Net::CLI::Interact;
+
 use List::MoreUtils qw (any firstval);
 
 use Data::Dumper;
@@ -505,7 +507,7 @@ sub _check_ssh {
         
     my $bytes_read = sysread($sock, $buf, 8192);
     
-    print STDERR "BUFF: $buf\n";
+    #print STDERR "BUFF: $buf\n";
     
     if (not defined $bytes_read) {
 		printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [Socket Error] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $!) if $self->{'options'}->{'debug'};
