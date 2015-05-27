@@ -466,10 +466,12 @@ sub _check_ssh {
 				next if $! == EAGAIN || $! == EWOULDBLOCK;
 				printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [Socket Error] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $!) if $self->{'options'}->{'debug'};
 				$self->_set_errormsg ("Socket Error:" . $!);
+				$sock->close;
 				return 0;
 			} elsif ($bytes_read == 0) {
 				printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [Remote host closed connection]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
 				$self->_set_errormsg ("Remote host closed connection");
+				$sock->close;
 				return 0;
 			}
 			
@@ -478,12 +480,14 @@ sub _check_ssh {
 			if (substr($line, 0, 4) eq "SSH-" and length($line) > 255) {
 				printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [SSH Version line too long]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
 				$self->_set_errormsg ("SSH Version line too long");
+				$sock->close;
 				return 0;
 			}
 			
 			if (length($line) > 4*1024) {
 				printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [SSH Pre-version line too long]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
 				$self->_set_errormsg ("SSH Pre-version line too long");
+				$sock->close;
 				return 0;
 			}
 			
@@ -499,11 +503,11 @@ sub _check_ssh {
     
     printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] Remote protocol version %s.%s, remote software version %s\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $remote_major, $remote_minor, $remote_version) if $self->{'options'}->{'debug'};
  
-    
+    # Write version string back.
     syswrite $sock, $line . "\n";
     
+	# Read more, should be encryption capabilities... 
     my $buf;
-        
     my $bytes_read = sysread($sock, $buf, 8192);
     
     #print STDERR "BUFF: $buf\n";
@@ -511,13 +515,19 @@ sub _check_ssh {
     if (not defined $bytes_read) {
 		printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [Socket Error] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $!) if $self->{'options'}->{'debug'};
 		$self->_set_errormsg ("Socket Error:" . $!);
+		$sock->close;
 		return 0;
 	} elsif ($bytes_read == 0) {
 		printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [Remote host closed connection]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
 		$self->_set_errormsg ("Remote host closed connection");
+		$sock->close;
 		return 0;
 	}
 	
+	# Found working SSH server. Sometimes doesn't work if host closes the
+	# connection after the key exchange, maybe we need to get the login
+	# prompt, but that's for another day...
+	#
 	printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] Found SSH running on this device.\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
 	
 	$sock->shutdown(2);
@@ -559,14 +569,19 @@ sub _check_telnet {
 		next if $! == EAGAIN || $! == EWOULDBLOCK;
 		printf ("DEBUG:	 [Device::Discover] [Telnet Check] [%s] [%s] [Socket Error] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $!) if $self->{'options'}->{'debug'};
 		$self->_set_errormsg ("Socket Error:" . $!);
+		$sock->close;
 		return 0;
 	} elsif ($bytes_read == 0) {
 		printf ("DEBUG:	 [Device::Discover] [Telnet Check] [%s] [%s] [Remote host closed connection]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
 		$self->_set_errormsg ("Remote host closed connection");
+		$sock->close;
 		return 0;
 	}
 	
 	printf ("DEBUG:	 [Device::Discover] [Telnet Check] [%s] [%s] Found Telnet running on this device.\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
+	
+	$sock->shutdown(2);
+	$sock->close;
 	
 	return 1;
 }
