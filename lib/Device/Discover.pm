@@ -288,7 +288,7 @@ sub get_community {
 		}
 	}
 
-	$self->_set_errormsg (sprintf ("[%s] [Community Discover] [%s] Can't find a usable snmp community.", $self->{'result'}->{'hostname'}));
+	$self->_set_errormsg ('[' . $self->{'result'}->{'hostname'} . "] [Community Discover] Can't find a usable snmp community.");
 
 	return 0;
 }
