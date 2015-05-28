@@ -139,18 +139,13 @@ sub get_management_protocol {
 
 	my $self = shift;
 	
-	my $ip_addr = inet_aton $self->{'result'}->{'hostname'} or do {
-		$self->_set_errormsg (sprintf ("[%s] [%s] [Failed to discover CLI managment protocol.] [Unknown hostname or IP address: %s]", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $self->{'result'}->{'hostname'}));
-		return 0;
-	};
-
 	return 'SSH' if $self->_check_ssh;
 	return 'TELNET' if $self->_check_telnet;
 
 	# Set error message and include the current error from the underlying
 	# managment protocol check.
 
-	$self->_set_errormsg (sprintf ("[%s] [%s] [Failed to discover CLI managment protocol.] [%s]", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $self->{'errormsg'}));
+	$self->_set_errormsg ('[Failed to discover CLI managment protocol.] [' . $self->{'errormsg'} . ']');
 
 	return 0;
 }
@@ -182,7 +177,7 @@ sub parse_sysdesc {
 	return 'asa'		if ( $descr =~ m/Cisco Adaptive Security Appliance/ );
 	return 'san-os'		if ( $descr =~ m/Cisco SAN-OS/ );
 
-	$self->_set_errormsg (sprintf ("[%s] [Unable to discover software running on device.]", $self->{'result'}->{'hostname'}));
+	$self->_set_errormsg ('Unable to discover software running on device.');
 	return 0;
 }
 
@@ -230,15 +225,15 @@ sub get_sysdesc {
 
 			$self->{'result'}->{'sysdesc'} = $line;
 			$line =~ s/\r|\n/ /g;
-			printf ("DEBUG:	 [Device::Discover] [SNMP] [%s] [%s]\n", $self->{'result'}->{'hostname'}, $line) if $self->{'options'}->{'debug'};
-
+			$self->_logger ('DEBUG', "[SNMP] [$line]") if $self->{'options'}->{'debug'};
+	
 			return 1;
 		} else {
-			$self->_set_errormsg (sprintf ("[%s] [SNMP] [%s]", $self->{'result'}->{'hostname'}, $session->error));
+			$self->_set_errormsg ('[SNMP] ' . $session->error);
 		}
 		$session->close;
 	} else {
-		$self->_set_errormsg (sprintf ("[%s] [SNMP] [%s]", $self->{'result'}->{'hostname'}, $error));
+		$self->_set_errormsg ('[SNMP] ' . $error);
 	}
 	return 0;
 }
@@ -269,7 +264,7 @@ sub get_community {
 													);
 
 		if (!defined($session)) {
-			$self->_set_errormsg (sprintf ("[%s] [Community Discover] [%s]", $self->{'result'}->{'hostname'}, $error));
+			$self->_set_errormsg ('[Community Discover] ' . $error);
 			return 0;
 		}
 
@@ -281,14 +276,14 @@ sub get_community {
 		if (defined($result)) {
 			$session->close;
 			
-			printf ("DEBUG:	 [Device::Discover] [Community Discover] [%s] [Found community in use on this device: %s]\n", $self->{'result'}->{'hostname'}, $community) if $self->{'options'}->{'debug'};
+			$self->_logger ('DEBUG', "[Community Discover] Found community in use on this device: $community") if $self->{'options'}->{'debug'};
 			
 			$self->{'result'}->{'community'} = $community;
 			return 1;
 		}
 	}
 
-	$self->_set_errormsg ('[' . $self->{'result'}->{'hostname'} . "] [Community Discover] Can't find a usable snmp community.");
+	$self->_set_errormsg ("[Community Discover] Can't find a usable snmp community.");
 
 	return 0;
 }
@@ -309,6 +304,12 @@ sub discover {
 
 	my $hostname = $self->{'result'}->{'hostname'};
 	
+	my $ip_addr = inet_aton $self->{'result'}->{'hostname'} or do {
+		$self->{'has_error'} = 1;
+		$self->_set_errormsg ('Unknown hostname or IP address: ' . $self->{'result'}->{'hostname'});
+		return 0;
+	};
+	
 	if ($self->{'options'}->{'find_community'}) {
 		unless ($self->get_community()) {
 			$self->{'has_error'} = 1;
@@ -324,7 +325,7 @@ sub discover {
 		};
 
 		if (my $software = $self->parse_sysdesc()) {
-			printf ("Device::Discover DEBUG: [%s] [Discovered device is running %s as it's software.]\n", $self->{'result'}->{'hostname'}, $software) if $self->{'options'}->{'debug'};
+			$self->_logger ('DEBUG', "Discovered device is running $software as it's software.") if $self->{'options'}->{'debug'};
 			$self->{'result'}->{'software'} = $software;
 		} else {
 			$self->{'has_error'} = 1;
@@ -466,6 +467,32 @@ sub _init {
 	return \%p;
 }
 
+=head2 _logger
+
+Log output such as debugging messages directly, by default send to 
+STDOUT, takes the type of error i.e. 'DEBUG', 'ERROR' etc although
+this can be anything which is prefixed to output. Adds the hostname
+and software (if discovered already) to the line along. $msg is the
+error message that will be logged.
+
+=cut
+
+sub _logger {
+	
+	my $self = shift;
+
+	my ($type, $msg, $channel) = @_;
+
+	$channel = *STDOUT unless (defined $channel);
+
+	$msg =~ s/\r|\n/ /g;
+	
+	my $pre = '[' . $self->{'result'}->{'hostname'} . ']';
+	
+	$pre .= ' [' . $self->{'result'}->{'software'} . ']' if (defined $self->{'result'}->{'software'});
+
+	printf $channel ("%-7s: [Device::Discover] %s %s\n", $type, $pre, $msg);
+}
 
 =head2 _set_errormsg
 
@@ -502,7 +529,7 @@ sub _check_ssh {
 	# Check if SSH should be ignored.
 	#
 	if (defined $self->{'result'}->{'software'} and defined $self->{'options'}->{'ssh_os_ignore'} and any {$self->{'result'}->{'software'} eq $_} (split ',', $self->{'options'}->{'ssh_os_ignore'})) {
-		printf ("DEBUG:	 [Device::Discover] [%s] [%s] [Ignoring SSH for this device.]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
+		$self->_logger ('DEBUG', '[SSH Check] Ignoring SSH for this device.') if $self->{'options'}->{'debug'};
 		return 0;
 	}
 	
@@ -512,8 +539,8 @@ sub _check_ssh {
 										Timeout		=> 4);
 									
 	unless ($sock) {
-		printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $!) if $self->{'options'}->{'debug'};
-		$self->_set_errormsg ($!); 
+		$self->_logger ('DEBUG', "[SSH Check] $!") if $self->{'options'}->{'debug'};
+		$self->_set_errormsg ("[SSH Check] $!"); 
 		return 0;
 	}
 	
@@ -533,13 +560,13 @@ sub _check_ssh {
 
 			if (not defined $bytes_read) {
 				next if $! == EAGAIN || $! == EWOULDBLOCK;
-				printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [Socket Error] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $!) if $self->{'options'}->{'debug'};
-				$self->_set_errormsg ("Socket Error:" . $!);
+				$self->_logger ('DEBUG', "[SSH Check] Socket Error: $!.") if $self->{'options'}->{'debug'};
+				$self->_set_errormsg ("[SSH Check] Socket Error:" . $!);
 				$sock->close;
 				return 0;
 			} elsif ($bytes_read == 0) {
-				printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [Remote host closed connection]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
-				$self->_set_errormsg ("Remote host closed connection");
+				$self->_logger ('DEBUG', '[SSH Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
+				$self->_set_errormsg ("[SSH Check] Remote host closed connection");
 				$sock->close;
 				return 0;
 			}
@@ -547,15 +574,15 @@ sub _check_ssh {
 			$line .= $buf;
 		   
 			if (substr($line, 0, 4) eq "SSH-" and length($line) > 255) {
-				printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [SSH Version line too long]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
-				$self->_set_errormsg ("SSH Version line too long");
+				$self->_logger ('DEBUG', '[SSH Check] SSH Version line too long.') if $self->{'options'}->{'debug'};
+				$self->_set_errormsg ("[SSH Check] SSH Version line too long");
 				$sock->close;
 				return 0;
 			}
 			
 			if (length($line) > 4*1024) {
-				printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [SSH Pre-version line too long]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
-				$self->_set_errormsg ("SSH Pre-version line too long");
+				$self->_logger ('DEBUG', '[SSH Check] SSH pre-version line too long.') if $self->{'options'}->{'debug'};
+				$self->_set_errormsg ("[SSH Check] SSH Pre-version line too long");
 				$sock->close;
 				return 0;
 			}
@@ -566,12 +593,12 @@ sub _check_ssh {
     
 	$line =~ s/\cM?\n$//;
     
-    printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] Found SSH remote version string: [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $line)  if $self->{'options'}->{'debug'};
-    	
+    $self->_logger ('DEBUG', "[SSH Check] Found SSH remote version string: $line") if $self->{'options'}->{'debug'};
+    
     my ($remote_major, $remote_minor, $remote_version) = $line =~ /^SSH-(\d+)\.(\d+)-([^\n]+)$/;
     
-    printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] Remote protocol version %s.%s, remote software version %s\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $remote_major, $remote_minor, $remote_version) if $self->{'options'}->{'debug'};
- 
+	$self->_logger ('DEBUG', "[SSH Check] Remote protocol version $remote_major.$remote_minor, remote software version $remote_version.") if $self->{'options'}->{'debug'};
+	
     # Write version string back.
     syswrite $sock, $line . "\n";
     
@@ -582,13 +609,13 @@ sub _check_ssh {
     #print STDERR "BUFF: $buf\n";
     
     if (not defined $bytes_read) {
-		printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [Socket Error] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $!) if $self->{'options'}->{'debug'};
-		$self->_set_errormsg ("Socket Error:" . $!);
+		$self->_logger ('DEBUG', "[SSH Check] Socket Error: $!") if $self->{'options'}->{'debug'};
+		$self->_set_errormsg ("[SSH Check] Socket Error: $!");
 		$sock->close;
 		return 0;
 	} elsif ($bytes_read == 0) {
-		printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] [Remote host closed connection]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
-		$self->_set_errormsg ("Remote host closed connection");
+		$self->_logger ('DEBUG', '[SSH Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
+		$self->_set_errormsg ('[SSH Check] Remote host closed connection.');
 		$sock->close;
 		return 0;
 	}
@@ -597,7 +624,7 @@ sub _check_ssh {
 	# connection after the key exchange, maybe we need to get the login
 	# prompt, but that's for another day...
 	#
-	printf ("DEBUG:	 [Device::Discover] [SSH Check] [%s] [%s] Found SSH running on this device.\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
+	$self->_logger ('DEBUG', '[SSH Check] Found SSH running on this device.') if $self->{'options'}->{'debug'};
 	
 	$sock->shutdown(2);
 	$sock->close;
@@ -622,7 +649,7 @@ sub _check_telnet {
 										Timeout		=> 4);
 									
 	unless ($sock) {
-		printf ("DEBUG:	 [Device::Discover] [Telnet Check] [%s] [%s] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $!) if $self->{'options'}->{'debug'};
+		$self->_logger ('DEBUG', "[Telnet Check] $!") if $self->{'options'}->{'debug'};
 		$self->_set_errormsg ($!); 
 		return 0;
 	}
@@ -636,18 +663,18 @@ sub _check_telnet {
 
 	if (not defined $bytes_read) {
 		next if $! == EAGAIN || $! == EWOULDBLOCK;
-		printf ("DEBUG:	 [Device::Discover] [Telnet Check] [%s] [%s] [Socket Error] [%s]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}, $!) if $self->{'options'}->{'debug'};
-		$self->_set_errormsg ("Socket Error:" . $!);
+		$self->_logger ('DEBUG', "[Telnet Check] Socket Error: $!") if $self->{'options'}->{'debug'};
+		$self->_set_errormsg ("[Telnet Check] Socket Error:" . $!);
 		$sock->close;
 		return 0;
 	} elsif ($bytes_read == 0) {
-		printf ("DEBUG:	 [Device::Discover] [Telnet Check] [%s] [%s] [Remote host closed connection]\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
-		$self->_set_errormsg ("Remote host closed connection");
+		$self->_logger ('DEBUG', '[Telnet Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
+		$self->_set_errormsg ("[Telnet Check] Remote host closed connection");
 		$sock->close;
 		return 0;
 	}
 	
-	printf ("DEBUG:	 [Device::Discover] [Telnet Check] [%s] [%s] Found Telnet running on this device.\n", $self->{'result'}->{'hostname'}, $self->{'result'}->{'software'}) if $self->{'options'}->{'debug'};
+	$self->_logger ('DEBUG', '[Telnet Check] Found Telnet running on this device.') if $self->{'options'}->{'debug'};
 	
 	$sock->shutdown(2);
 	$sock->close;
