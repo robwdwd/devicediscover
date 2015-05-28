@@ -225,7 +225,7 @@ sub get_sysdesc {
 
 			$self->{'result'}->{'sysdesc'} = $line;
 			$line =~ s/\r|\n/ /g;
-			$self->_logger ('DEBUG', "[SNMP] [$line]") if $self->{'options'}->{'debug'};
+			$self->_logger ('DEBUG', "[SNMP] [$line]") if $self->{'options'}->{'debug'} >= 2;
 	
 			return 1;
 		} else {
