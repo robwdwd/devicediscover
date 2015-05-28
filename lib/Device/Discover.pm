@@ -203,6 +203,10 @@ sub get_sysdesc {
 	my $session;
 	my $error;
 
+	my $community = $self->{'options'}->{'community'};
+	
+	$community = $self->{'result'}->{'community'} if ($self->{'options'}->{'find_community'});
+
 	if ($self->{'options'}->{'snmpversion'} == 3) {
 		($session, $error) = Net::SNMP->session(	Hostname => $self->{'options'}->{'hostname'},
 													Version => $self->{'options'}->{'snmpversion'},
@@ -212,7 +216,7 @@ sub get_sysdesc {
 	} else {
 		($session, $error) = Net::SNMP->session(	Hostname => $self->{'options'}->{'hostname'},
 													Version => $self->{'options'}->{'snmpversion'},
-													Community => $self->{'options'}->{'community'},
+													Community => $community,
 													Timeout => $self->{'options'}->{'snmptimeout'});
 	}
 
@@ -239,6 +243,56 @@ sub get_sysdesc {
 	return 0;
 }
 
+=head2 get_community
+
+Find the community used on this device from community list.
+
+=cut
+
+sub get_community {
+	
+	use Net::SNMP;
+	
+	my $self = shift;
+
+	my $sysDesc   = '1.3.6.1.2.1.1.1.0';
+
+	my @community_list = split (',', $self->{'options'}->{'community_list'});
+
+	foreach my $community (@community_list) {
+
+		my ($session, $error) = Net::SNMP->session(Hostname	=> $self->{'options'}->{'hostname'},
+													Version		=> 2,
+													Community	=> $community,
+													Timeout		=> $self->{'options'}->{'snmptimeout'},
+													Retries		=> 1
+													);
+
+		if (!defined($session)) {
+			$self->_set_errormsg (sprintf ("[%s] [Community Discover] [%s]", $self->{'result'}->{'hostname'}, $error));
+			return 0;
+		}
+
+		my $result = $session->get_request( Varbindlist => [$sysDesc] );
+
+		# If there is an snmp response this community works
+		# no need to find any others so move on to the next device.
+		#
+		if (defined($result)) {
+			$session->close;
+			
+			printf ("DEBUG:	 [Device::Discover] [Community Discover] [%s] [Found community in use on this device: %s]\n", $self->{'result'}->{'hostname'}, $community) if $self->{'options'}->{'debug'};
+			
+			$self->{'result'}->{'community'} = $community;
+			return 1;
+		}
+	}
+
+	$self->_set_errormsg (sprintf ("[%s] [Community Discover] [%s] Can't find a usable snmp community.", $self->{'result'}->{'hostname'}));
+
+	return 0;
+}
+
 =head2 discover
 
 Discovers the device. If software isn't given as an argument it will
@@ -254,6 +308,13 @@ sub discover {
 	my $self = shift;
 
 	my $hostname = $self->{'result'}->{'hostname'};
+	
+	if ($self->{'options'}->{'find_community'}) {
+		unless ($self->get_community()) {
+			$self->{'has_error'} = 1;
+			return 0;
+		};
+	}
 
 	unless (defined $self->{'options'}->{'software'}) {
 
@@ -370,6 +431,14 @@ sub _init {
 					default => 1
 				},
 				debug => {
+					type	=> SCALAR | UNDEF,
+					default => 0
+				},
+				community_list => {
+					type => SCALAR | UNDEF,
+					optional => 1
+				},
+				find_community => {
 					type	=> SCALAR | UNDEF,
 					default => 0
 				},
