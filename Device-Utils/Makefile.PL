@@ -18,8 +18,13 @@ WriteMakefile(
         'Test::More' => 0,
     },
     PREREQ_PM => {
-        #'ABC'              => 1.6,
-        #'Foo::Bar::Module' => 5.0401,
+		'Mail::Sender'						=> 0.8.21,
+		'Params::Validate'					=> 0,
+		'Text::Trim'						=> 0,
+		'Log::Dispatch'						=> 0,
+		'Log::Dispatch::Screen'				=> 0,
+		'Log::Dispatch::FileShared'			=> 1.03,
+		'Log::Dispatch::Log::Syslog::Fast'	=> 1.03
     },
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean => { FILES => 'Device-Utils-*' },

@@ -296,8 +296,10 @@ sub readNlines {
 	
 	my $lines = [];
 	
+	
+	
 	unless ($fh) {
-		carp "Seedfile not open, will not return any seed lines.";
+		$self->logger ('error', 'ERROR', 'Seedfile not open, returning empty list.');
 		return 0;
 	}
 	
@@ -393,42 +395,11 @@ sub close_seedfile {
 	
 	if ($self->{'sfh'}) {
 		close $self->{'sfh'};
-		$self->{'sfh'} = undef;
 	}
 	
+	$self->{'sfh'} = undef;
+	
 }
-
-=head2 has_error
-
-Returns if the object has an error.
-
-=cut
-
-sub has_error {
-	my $self = shift;
-
-	return $self->{'has_error'};
-}
-
-=head2 errormsg
-
-Returns the last error message. Use has_error to check if a device
-has an error, relying on this to return an empty string to check for
-errors might produce unexpected results (sometimes non fatal error
-messages can be stored here.)
-
-=cut
-
-sub errormsg {
-	my $self = shift;
-	return $self->{'errormsg'};
-}
-
-=head2 function2
-
-=cut
-
-
 
 #~ sub mail_sender {
 #~ 
@@ -586,8 +557,6 @@ sub _setup_logging {
 	#
 	if ($self->{'options'}->{'syslog'}) {
 		
-		print Dumper $self->{'options'}->{'syslog'};
-
 		# Go through each syslog server and add to the log dispatcher.
 		#		
 		foreach (keys %{$self->{'options'}->{'syslog'}}) {
