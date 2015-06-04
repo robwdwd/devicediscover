@@ -5,6 +5,8 @@ use warnings;
 
 our $VERSION = '1.03';
 
+
+use Data::Dumper;
 use Log::Dispatch::Output;
 use parent qw( Log::Dispatch::Output );
 
@@ -138,8 +140,7 @@ sub log_message {
 		$self->{logger}->send($p{message});
 	};
 	
-	print Dumper $self;
-	print STDERR "Failed to send to syslog $self->{logger}->{host}: $@" if $@;
+	print STDERR "Failed to send to syslog $self->{name}: $@" if $@;
 }
 
 1;
