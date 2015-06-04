@@ -60,7 +60,7 @@ and discoveres the software running on the device using SNMP sysDesc.
 
 =head2 new
 
-Creates new Net::Device Discover::Object.
+Creates new Device::Discover Object.
 
 	$device = Device::Discover->new(
 										hostname		=> $hostname,
