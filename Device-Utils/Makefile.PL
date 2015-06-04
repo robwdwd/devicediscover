@@ -18,7 +18,7 @@ WriteMakefile(
         'Test::More' => 0,
     },
     PREREQ_PM => {
-		'Mail::Sender'						=> 0.8.21,
+		'Mail::Sender'						=> 0.8.20,
 		'Params::Validate'					=> 0,
 		'Text::Trim'						=> 0,
 		'Log::Dispatch'						=> 0,
