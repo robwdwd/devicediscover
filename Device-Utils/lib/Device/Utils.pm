@@ -232,7 +232,7 @@ sub fork_counts {
 	
 	return 0 unless $total_lines;
 	
-	$processes = $processes || 1; # Can't have 0 or negative processes.
+	$processes = 1 if $processes <= 0; # Can't have 0 or negative processes.
 	
 	# Check if the total lines is less than the maximum processes, if so divide
 	# by three.
