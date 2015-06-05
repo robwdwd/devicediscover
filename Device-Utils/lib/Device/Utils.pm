@@ -420,6 +420,8 @@ init function to validate arguments, not called directly.
 
 sub mail_sender {
 
+	my $self = shift;
+
 	unless ($self->{'options'}->{'faillog'}) {
 		$self->logger ('error', 'ERROR', "Can't mail failed log, faillog is not enabled.");
 		return;
