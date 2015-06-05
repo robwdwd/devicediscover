@@ -52,7 +52,7 @@ Set's up flexible logging using Log::Dispatch.
 	# Create Parallel::ForkManager with number of processes.
 	#
 	my $pm = Parallel::ForkManager->new($processes);
-
+l
 	while ((my $devices = $dutils->readNlines($queue_size))) {
 		
 		$pm->start() and do next; # do the fork
@@ -88,6 +88,7 @@ Set's up flexible logging using Log::Dispatch.
 								[seedfile		=> $filename,]
 								[valid_line_sub	=> $subref,]
 								[syslog			=> $syslog],
+								[mail			=> $mailhashref],
 								[debuglog		=> $options->debuglog],
 								[infolog		=> $options->infolog],
 								[errorlog		=> $options->errorlog],
@@ -135,6 +136,18 @@ Takes a hash reference to syslog servers.
 						
 				....
 			};
+			
+=head3 mail
+
+Takes a hash reference with mail sending details.
+
+	my $mail = {
+			   'server' => 'localhost',
+			   'subject' => 'Device Failed Log',
+			   'from' => 'devices@example.net',
+			   'to' => 'support@example.net',
+			   'cc' => 'admins@example.net'
+			};
 
 
 =head3 debuglog
@@ -164,8 +177,6 @@ sub new {
 	my %options = @_;
 
 	my $self = {
-		has_err => 0,
-		errormsg => undef,
 		sfh => undef,
 		sf_count => 0,
 		vlsubref => undef,
@@ -401,45 +412,52 @@ sub close_seedfile {
 	
 }
 
-#~ sub mail_sender {
-#~ 
-	#~ unless ($config{mail}) {
-		#~ logger ('error', 'ERROR', "--mail-failed set but not configuration found, missing <mail> section.");
-		#~ return;
-	#~ }
-#~ 
-	#~ use Mail::Sender;
-	#~ 
-	#~ logger ('debug', 'DEBUG', "Sending failed log file email.") if $options->debug;
-	#~ 
-	#~ my $subject = $options->subject || 'Device backup failed log';
-#~ 
-	#~ eval {
-	#~ 
-		#~ open FAILLOG, $options->faillog;
-		#~ 
-		#~ my $sender = new Mail::Sender ({
-			#~ on_errors => 'die',
-			#~ smtp => $config{mail}{server},
-			#~ from => $config{mail}{from},
-			#~ to => $options->to,
-			#~ cc => $options->cc
-			#~ });
-#~ 
-		#~ $sender->Open({subject => $subject});
-		#~ 
-		#~ # Get number of lines in file.
-		#~ while(<FAILLOG>) {
-			#~ $sender->SendLineEnc($_);
-		#~ }
-#~ 
-		#~ $sender->Close; 
-		#~ close FAILLOG;
-	#~ };
-	#~ if ($@) {
-		#~ logger ('error', 'ERROR', "Failed to send the failed log email: $@");
-	#~ }
-#~ }
+=head2 _init
+
+init function to validate arguments, not called directly.
+
+=cut
+
+sub mail_sender {
+
+	unless ($self->{'options'}->{'faillog'}) {
+		$self->logger ('error', 'ERROR', "Can't mail failed log, faillog is not enabled.");
+		return;
+	}
+
+	use Mail::Sender;
+
+	$self->logger ('debug', 'DEBUG', "Sending failed log file email.") if $self->{'options'}->{'debug'};
+
+	my $subject = $self->{'options'}->{'mail'}->{'subject'} || 'Device failure log.';
+
+	eval {
+
+		open FAILLOG, $self->{'options'}->{'faillog'};
+
+		my $sender = new Mail::Sender ({
+			on_errors => 'die',
+			smtp => $self->{'options'}->{'mail'}->{'server'},
+			from => $self->{'options'}->{'mail'}->{'from'},
+			to => $self->{'options'}->{'mail'}->{'to'},
+			cc => $self->{'options'}->{'mail'}->{'cc'}
+			});
+
+		$sender->Open({subject => $subject});
+
+		# Get number of lines in file.
+		while(<FAILLOG>) {
+			trim $_;
+			$sender->SendLineEnc($_);
+		}
+
+		$sender->Close;
+		close FAILLOG;
+	};
+	if ($@) {
+		$self->logger ('error', 'ERROR', "Failed to send the failed log email: $@");
+	}
+}
 
 
 =head1 INTERNAL METHODS
@@ -473,6 +491,11 @@ sub _init {
 					optional => 1
 				},
 				syslog => {
+					type	=> HASHREF | UNDEF,
+					optional => 1,
+					default => undef
+				},
+				mail => {
 					type	=> HASHREF | UNDEF,
 					optional => 1,
 					default => undef
