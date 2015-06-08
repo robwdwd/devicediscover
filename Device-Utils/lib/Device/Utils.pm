@@ -394,6 +394,22 @@ sub logger {
 	
 }
 
+=head2 get_logobj
+
+Returns the Log::Dispatch reference for logging. If you want this module
+to set up logging for you but want to send log messages without using
+the logger method.
+
+=cut
+
+sub get_logobj {
+	
+	my $self = shift;
+	
+	return $self->{'log'};
+	
+}
+
 =head2 close_seedfile
 
 Close the seedfile.

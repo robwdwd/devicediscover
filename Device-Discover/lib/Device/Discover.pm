@@ -5,15 +5,15 @@ use strict;
 use warnings FATAL => 'all';
 
 use Errno qw(EAGAIN EWOULDBLOCK);
-
 use Carp;
+use Scalar::Util qw(blessed );
 
-use Params::Validate qw( validate SCALAR UNDEF );
+use Params::Validate qw( validate SCALAR UNDEF OBJECT );
 use IO::Socket::INET;
 
 use List::MoreUtils qw (any firstval);
 
-use Data::Dumper;
+
 
 =head1 NAME
 
@@ -31,7 +31,7 @@ our $VERSION = '0.01';
 =head1 SYNOPSIS
 
 Device discovery module. Get's device managment protocol, either ssh or telnet
-and discoveres the software running on the device using SNMP sysDesc.
+and discoveres the os (operating system) running on the device using SNMP sysDesc.
 
 	use Device::Discover;
 
@@ -50,7 +50,7 @@ and discoveres the software running on the device using SNMP sysDesc.
 		print STDERR "ERROR: " . $device->errormsg . ".\n";
 	} else {
 		print $d->{'hostname'} . "\n";
-		print $d->{'software'} . "\n";
+		print $d->{'os'} . "\n";
 		print $d->{'protocol'} . "\n";
 	}
 
@@ -64,7 +64,7 @@ Creates new Device::Discover Object.
 
 	$device = Device::Discover->new(
 										hostname		=> $hostname,
-										[software		=> $software,]
+										[os				=> $os,]
 										[protocol		=> $protocol,]
 										[ssh_os_ignore	=> $ssh_os_ignore,]
 										[snmpversion	=> $snmpversion,]
@@ -72,6 +72,7 @@ Creates new Device::Discover Object.
 										[snmpusername	=> $snmpusername,]
 										[snmppassword	=> $snmppassword,]
 										[snmptimeout	=> $snmptimeout,]
+										[logobj			=> $logobj,]
 										[debug			=> $debug]
 										);
 
@@ -80,18 +81,18 @@ returned on success.
 
 The first parameter, or "hostname" argument, is required.
 
-One of the software, community or snmpusername/snmppassword arguments
-must be passed. If you set software then no SNMP discovery of
-the software running on the device will be done. If you want to discover
-the device software then set the community argument or the
+One of the os (software), community or snmpusername/snmppassword arguments
+must be passed. If you set os then no SNMP discovery of
+the os running on the device will be done. If you want to discover
+the device os then set the community argument or the
 snmpusername/snmppassword arguments. Setting both will have the same
-effect as just passing the software argument without a community or
+effect as just passing the os argument without a community or
 snmpusername/snmppassword arguments.
 
 If the protocol argument is set then no discovery of the CLI managment
 protocol will be done.
 
-It makes no sense to set the protocol and software arguments, if you
+It makes no sense to set the protocol and os arguments, if you
 already know both of these you don't need this module.
 
 snmpversion by default is set to 2 for snmp v2c. If you set this to 2
@@ -100,10 +101,13 @@ give the snmpusername and snmppasswords.
 
 snmptimeout defaults to 1 second.
 
-ssh_os_ignore argument takes a comma seperated string os software names
+ssh_os_ignore argument takes a comma seperated string os os names
 to ignore when checking for SSH. This saves time when you know certain
-software running on devices is not capable of running ssh but might allow
+os running on devices is not capable of running ssh but might allow
 connections on the ssh port (only to send an error back down the connection.)
+
+logobj is a reference to a Log::Dispatch object if you want to log output
+to Log::Dispatch, this has to be set up first.
 
 =cut
 
@@ -114,14 +118,17 @@ sub new {
 	my $self = {
 		has_err => 0,
 		errormsg => undef,
+		logobj	=> undef,
 		result => {},
 		options => {}
 	};
 	bless($self, $class);
 
 	$self->{'options'} = $self->_init(%options);
-
-	#print Dumper $self;
+	
+	if (blessed ($self->{'options'}->{'logobj'}) eq "Log::Dispatch") {
+		$self->{'logobj'} = $self->{'options'}->{'logobj'};
+	}
 
 	return($self);
 }
@@ -177,7 +184,7 @@ sub parse_sysdesc {
 	return 'asa'		if ( $descr =~ m/Cisco Adaptive Security Appliance/ );
 	return 'san-os'		if ( $descr =~ m/Cisco SAN-OS/ );
 
-	$self->_set_errormsg ('Unable to discover software running on device.');
+	$self->_set_errormsg ('Unable to discover os running on device.');
 	return 0;
 }
 
@@ -225,7 +232,7 @@ sub get_sysdesc {
 
 			$self->{'result'}->{'sysdesc'} = $line;
 			$line =~ s/\r|\n/ /g;
-			$self->_logger ('DEBUG', "[SNMP] [$line]") if $self->{'options'}->{'debug'} >= 2;
+			$self->_logger ('debug', 'DEBUG', "[SNMP] [$line]") if $self->{'options'}->{'debug'} >= 2;
 	
 			return 1;
 		} else {
@@ -276,7 +283,7 @@ sub get_community {
 		if (defined($result)) {
 			$session->close;
 			
-			$self->_logger ('DEBUG', "[Community Discover] Found community in use on this device: $community") if $self->{'options'}->{'debug'};
+			$self->_logger ('debug', 'DEBUG', "[Community Discover] Found community in use on this device: $community") if $self->{'options'}->{'debug'};
 			
 			$self->{'result'}->{'community'} = $community;
 			return 1;
@@ -290,11 +297,11 @@ sub get_community {
 
 =head2 discover
 
-Discovers the device. If software isn't given as an argument it will
-connect via SNMP to get the device software.
+Discovers the device. If os isn't given as an argument it will
+connect via SNMP to get the device os.
 
 Returns a reference to the results hash with the device name/ip,
-software, SNMP sysDesc and managment protocol.
+os, SNMP sysDesc and managment protocol.
 
 =cut
 
@@ -317,22 +324,22 @@ sub discover {
 		};
 	}
 
-	unless (defined $self->{'options'}->{'software'}) {
+	unless (defined $self->{'options'}->{'os'}) {
 
 		unless ($self->get_sysdesc()) {
 			$self->{'has_error'} = 1;
 			return 0;
 		};
 
-		if (my $software = $self->parse_sysdesc()) {
-			$self->_logger ('DEBUG', "Discovered device is running $software as it's software.") if $self->{'options'}->{'debug'};
-			$self->{'result'}->{'software'} = $software;
+		if (my $os = $self->parse_sysdesc()) {
+			$self->_logger ('debug', 'DEBUG', "Discovered device is running $os as it's operating system.") if $self->{'options'}->{'debug'};
+			$self->{'result'}->{'os'} = $os;
 		} else {
 			$self->{'has_error'} = 1;
 			return 0;
 		}
 	} else {
-		$self->{'result'}->{'software'} = $self->{'options'}->{'software'};
+		$self->{'result'}->{'os'} = $self->{'options'}->{'os'};
 	}
 
 	unless (defined $self->{'options'}->{'protocol'}) {
@@ -395,7 +402,7 @@ sub _init {
 				hostname => {
 					type	=> SCALAR
 				},
-				software => {
+				os => {
 					type	=> SCALAR,
 					optional => 1,
 					default => undef,
@@ -443,23 +450,28 @@ sub _init {
 					type	=> SCALAR | UNDEF,
 					default => 0
 				},
+				logobj => {
+					type	=> OBJECT | UNDEF,
+					default => 0,
+					optional => 1
+				},
 
 		}
 	);
 
-	if (not defined $p{'software'}) {
+	if (not defined $p{'os'}) {
 		if ($p{'snmpversion'} == 2 and not defined $p{'community'}) {
-			croak "Device::Discover, community argument must be passed when snmpversion argument set to 2 (default) and no software argument passed.";
+			croak "Device::Discover, community argument must be passed when snmpversion argument set to 2 (default) and no os argument passed.";
 		}
 
 		if ($p{'snmpversion'} == 3 and (not defined $p{'snmpusername'} or not defined $p{'snmppassword'})) {
-			croak "Device::Discover, snmpusername and snmppassword arguments must be passed (and not undef) when snmpversion argument set to 3 and no software argument passed.";
+			croak "Device::Discover, snmpusername and snmppassword arguments must be passed (and not undef) when snmpversion argument set to 3 and no os argument passed.";
 		}
 
 	}
 
-	if (defined $p{'software'} and defined $p{'protocol'}) {
-		croak "Device::Discover, passing the software and protocol arguments just adds overhead to your script, there's nothing to discover if you know these already.";
+	if (defined $p{'os'} and defined $p{'protocol'}) {
+		croak "Device::Discover, passing the os and protocol arguments just adds overhead to your script, there's nothing to discover if you know these already.";
 	}
 
 	$self->{'result'}->{'hostname'} = $p{hostname};
@@ -472,7 +484,7 @@ sub _init {
 Log output such as debugging messages directly, by default send to 
 STDOUT, takes the type of error i.e. 'DEBUG', 'ERROR' etc although
 this can be anything which is prefixed to output. Adds the hostname
-and software (if discovered already) to the line along. $msg is the
+and os (if discovered already) to the line along. $msg is the
 error message that will be logged.
 
 =cut
@@ -480,19 +492,27 @@ error message that will be logged.
 sub _logger {
 	
 	my $self = shift;
-
-	my ($type, $msg, $channel) = @_;
-
-	$channel = *STDOUT unless (defined $channel);
-
+	
+	my ($level, $tag, $msg) = @_;
+	
 	$msg =~ s/\r|\n/ /g;
 	
 	my $pre = '[' . $self->{'result'}->{'hostname'} . ']';
 	
-	$pre .= ' [' . $self->{'result'}->{'software'} . ']' if (defined $self->{'result'}->{'software'});
+	$pre .= ' [' . $self->{'result'}->{'os'} . ']' if (defined $self->{'result'}->{'os'});
 
-	printf $channel ("%-7s: [Device::Discover] %s %s\n", $type, $pre, $msg);
+	my $message = sprintf ("%-7s: [Device::Discover] %s %s\n", $tag, $pre, $msg);
+	
+	
+	if (defined $self->{'logobj'}) {
+		$self->{'logobj'}->log( level => $level, message => $message);
+	} else {
+		printf $message;
+	}
+	
+	return 1;
 }
+
 
 =head2 _set_errormsg
 
@@ -517,8 +537,8 @@ sub _set_errormsg {
 
 Checks if SSH is available on device.
 
-If ssh_os_ignore is set and software is already discovered or set in
-options then software is checked against ignore array to determine
+If ssh_os_ignore is set and os is already discovered or set in
+options then os is checked against ignore array to determine
 if ssh should be ignored for this device.
 
 =cut
@@ -528,8 +548,8 @@ sub _check_ssh {
 
 	# Check if SSH should be ignored.
 	#
-	if (defined $self->{'result'}->{'software'} and defined $self->{'options'}->{'ssh_os_ignore'} and any {$self->{'result'}->{'software'} eq $_} (split ',', $self->{'options'}->{'ssh_os_ignore'})) {
-		$self->_logger ('DEBUG', '[SSH Check] Ignoring SSH for this device.') if $self->{'options'}->{'debug'};
+	if (defined $self->{'result'}->{'os'} and defined $self->{'options'}->{'ssh_os_ignore'} and any {$self->{'result'}->{'os'} eq $_} (split ',', $self->{'options'}->{'ssh_os_ignore'})) {
+		$self->_logger ('debug', 'DEBUG', '[SSH Check] Ignoring SSH for this device.') if $self->{'options'}->{'debug'};
 		return 0;
 	}
 	
@@ -539,7 +559,7 @@ sub _check_ssh {
 										Timeout		=> 4);
 									
 	unless ($sock) {
-		$self->_logger ('DEBUG', "[SSH Check] $!") if $self->{'options'}->{'debug'};
+		$self->_logger ('debug', 'DEBUG', "[SSH Check] $!") if $self->{'options'}->{'debug'};
 		$self->_set_errormsg ("[SSH Check] $!"); 
 		return 0;
 	}
@@ -560,12 +580,12 @@ sub _check_ssh {
 
 			if (not defined $bytes_read) {
 				next if $! == EAGAIN || $! == EWOULDBLOCK;
-				$self->_logger ('DEBUG', "[SSH Check] Socket Error: $!.") if $self->{'options'}->{'debug'};
+				$self->_logger ('debug', 'DEBUG', "[SSH Check] Socket Error: $!.") if $self->{'options'}->{'debug'};
 				$self->_set_errormsg ("[SSH Check] Socket Error:" . $!);
 				$sock->close;
 				return 0;
 			} elsif ($bytes_read == 0) {
-				$self->_logger ('DEBUG', '[SSH Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
+				$self->_logger ('debug', 'DEBUG', '[SSH Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
 				$self->_set_errormsg ("[SSH Check] Remote host closed connection");
 				$sock->close;
 				return 0;
@@ -574,14 +594,14 @@ sub _check_ssh {
 			$line .= $buf;
 		   
 			if (substr($line, 0, 4) eq "SSH-" and length($line) > 255) {
-				$self->_logger ('DEBUG', '[SSH Check] SSH Version line too long.') if $self->{'options'}->{'debug'};
+				$self->_logger ('debug', 'DEBUG', '[SSH Check] SSH Version line too long.') if $self->{'options'}->{'debug'};
 				$self->_set_errormsg ("[SSH Check] SSH Version line too long");
 				$sock->close;
 				return 0;
 			}
 			
 			if (length($line) > 4*1024) {
-				$self->_logger ('DEBUG', '[SSH Check] SSH pre-version line too long.') if $self->{'options'}->{'debug'};
+				$self->_logger ('debug', 'DEBUG', '[SSH Check] SSH pre-version line too long.') if $self->{'options'}->{'debug'};
 				$self->_set_errormsg ("[SSH Check] SSH Pre-version line too long");
 				$sock->close;
 				return 0;
@@ -593,11 +613,11 @@ sub _check_ssh {
     
 	$line =~ s/\cM?\n$//;
     
-    $self->_logger ('DEBUG', "[SSH Check] Found SSH remote version string: $line") if $self->{'options'}->{'debug'};
+    $self->_logger ('debug', 'DEBUG', "[SSH Check] Found SSH remote version string: $line") if $self->{'options'}->{'debug'};
     
     my ($remote_major, $remote_minor, $remote_version) = $line =~ /^SSH-(\d+)\.(\d+)-([^\n]+)$/;
     
-	$self->_logger ('DEBUG', "[SSH Check] Remote protocol version $remote_major.$remote_minor, remote software version $remote_version.") if $self->{'options'}->{'debug'};
+	$self->_logger ('debug', 'DEBUG', "[SSH Check] Remote protocol version $remote_major.$remote_minor, remote software version $remote_version.") if $self->{'options'}->{'debug'};
 	
     # Write version string back.
     syswrite $sock, $line . "\n";
@@ -609,12 +629,12 @@ sub _check_ssh {
     #print STDERR "BUFF: $buf\n";
     
     if (not defined $bytes_read) {
-		$self->_logger ('DEBUG', "[SSH Check] Socket Error: $!") if $self->{'options'}->{'debug'};
+		$self->_logger ('debug', 'DEBUG', "[SSH Check] Socket Error: $!") if $self->{'options'}->{'debug'};
 		$self->_set_errormsg ("[SSH Check] Socket Error: $!");
 		$sock->close;
 		return 0;
 	} elsif ($bytes_read == 0) {
-		$self->_logger ('DEBUG', '[SSH Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
+		$self->_logger ('debug', 'DEBUG', '[SSH Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
 		$self->_set_errormsg ('[SSH Check] Remote host closed connection.');
 		$sock->close;
 		return 0;
@@ -624,7 +644,7 @@ sub _check_ssh {
 	# connection after the key exchange, maybe we need to get the login
 	# prompt, but that's for another day...
 	#
-	$self->_logger ('DEBUG', '[SSH Check] Found SSH running on this device.') if $self->{'options'}->{'debug'};
+	$self->_logger ('debug', 'DEBUG', '[SSH Check] Found SSH running on this device.') if $self->{'options'}->{'debug'};
 	
 	$sock->shutdown(2);
 	$sock->close;
@@ -649,7 +669,7 @@ sub _check_telnet {
 										Timeout		=> 4);
 									
 	unless ($sock) {
-		$self->_logger ('DEBUG', "[Telnet Check] $!") if $self->{'options'}->{'debug'};
+		$self->_logger ('debug', 'DEBUG', "[Telnet Check] $!") if $self->{'options'}->{'debug'};
 		$self->_set_errormsg ($!); 
 		return 0;
 	}
@@ -663,18 +683,18 @@ sub _check_telnet {
 
 	if (not defined $bytes_read) {
 		next if $! == EAGAIN || $! == EWOULDBLOCK;
-		$self->_logger ('DEBUG', "[Telnet Check] Socket Error: $!") if $self->{'options'}->{'debug'};
+		$self->_logger ('debug', 'DEBUG', "[Telnet Check] Socket Error: $!") if $self->{'options'}->{'debug'};
 		$self->_set_errormsg ("[Telnet Check] Socket Error:" . $!);
 		$sock->close;
 		return 0;
 	} elsif ($bytes_read == 0) {
-		$self->_logger ('DEBUG', '[Telnet Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
+		$self->_logger ('debug', 'DEBUG', '[Telnet Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
 		$self->_set_errormsg ("[Telnet Check] Remote host closed connection");
 		$sock->close;
 		return 0;
 	}
 	
-	$self->_logger ('DEBUG', '[Telnet Check] Found Telnet running on this device.') if $self->{'options'}->{'debug'};
+	$self->_logger ('debug', 'DEBUG', '[Telnet Check] Found Telnet running on this device.') if $self->{'options'}->{'debug'};
 	
 	$sock->shutdown(2);
 	$sock->close;
