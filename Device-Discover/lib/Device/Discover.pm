@@ -184,7 +184,7 @@ sub parse_sysdesc {
 	return 'asa'		if ( $descr =~ m/Cisco Adaptive Security Appliance/ );
 	return 'san-os'		if ( $descr =~ m/Cisco SAN-OS/ );
 
-	$self->_set_errormsg ('Unable to discover os running on device.');
+	$self->_set_errormsg ('Unable to discover os running on device. sysDesc or lldpDesc not parseable: ' . $self->{'result'}->{'sysdesc'} );
 	return 0;
 }
 
