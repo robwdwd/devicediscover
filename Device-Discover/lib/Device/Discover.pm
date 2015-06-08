@@ -126,7 +126,7 @@ sub new {
 
 	$self->{'options'} = $self->_init(%options);
 	
-	if (blessed ($self->{'options'}->{'logobj'}) eq "Log::Dispatch") {
+	if (blessed ($self->{'options'}->{'logobj'}) eq "Log::Dispatch" && (defined $self->{'options'}->{'logobj'} ) {
 		$self->{'logobj'} = $self->{'options'}->{'logobj'};
 	}
 
@@ -452,7 +452,7 @@ sub _init {
 				},
 				logobj => {
 					type	=> OBJECT | UNDEF,
-					default => 0,
+					default => undef,
 					optional => 1
 				},
 

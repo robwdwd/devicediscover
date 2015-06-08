@@ -376,14 +376,14 @@ sub logger {
 	if ($device) {
 		
 		return 0 unless (ref($device) eq "HASH");
-		return 0 unless ($device->{'hostname'});
+	
+		my $pre = '';
+	
+		$pre .= '[' . $device->{'hostname'} . '] '	if (defined $device->{'hostname'});
+		$pre .= '[' . $device->{'os'} . '] ' 		if (defined $device->{'os'});
+		$pre .= '[' . $device->{'protocol'} . '] '	if (defined $device->{'protocol'});
 		
-		my $pre = '[' . $device->{'hostname'} . ']';
-		
-		$pre .= ' [' . $device->{'os'} . ']' 		if (defined $device->{'os'});
-		$pre .= ' [' . $device->{'protocol'} . ']'	if (defined $device->{'protocol'});
-		
-		$message = sprintf ("%-7s: %s %s\n", $tag, $pre, $msg);
+		$message = sprintf ("%-7s: %s%s\n", $tag, $pre, $msg);
 	} else {
 		$message = sprintf ("%-7s: %s\n", $tag, $msg);
 	}
