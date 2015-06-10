@@ -410,6 +410,19 @@ sub get_logobj {
 	
 }
 
+=head2 get_sf_count
+
+Returns the total amount of lines found in the seedfile.
+
+=cut
+
+sub get_sf_count {
+	
+	my $self = shift;
+		
+	return $self->{'sf_count'};
+}
+
 =head2 close_seedfile
 
 Close the seedfile.
