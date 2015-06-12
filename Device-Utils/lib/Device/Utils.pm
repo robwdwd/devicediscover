@@ -688,7 +688,6 @@ sub _setup_logging {
 		Log::Dispatch::FileShared->new(
 			name      => 'combined_log',
 			min_level => 'debug',
-			max_level => 'alert',
 			filename  => $self->{'options'}->{'combined_log'},
 			mode      => '>'
 		)
