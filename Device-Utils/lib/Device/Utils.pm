@@ -52,7 +52,7 @@ Set's up flexible logging using Log::Dispatch.
 	# Create Parallel::ForkManager with number of processes.
 	#
 	my $pm = Parallel::ForkManager->new($processes);
-l
+
 	while ((my $devices = $dutils->readNlines($queue_size))) {
 		
 		$pm->start() and do next; # do the fork
@@ -170,6 +170,10 @@ File to log fail messages to, anything sent at level 'critical' or 'alert'.
 
 Suppress log output to STDIN and STDERR.
 
+=head3 debug
+
+Set to an integer value above 0 to get some debug output.
+
 =cut
 
 sub new {
@@ -213,8 +217,6 @@ sub new {
 	
 	if ($self->{'options'}->{'valid_line_sub'}) {
 		$self->{'vlsubref'} = $self->{'options'}->{'valid_line_sub'};
-	} else {
-		$self->{'vlsubref'} = \$self->_valid_line;
 	}
 	
 	return($self);
@@ -318,7 +320,15 @@ sub readNlines {
 
 		trim $_;
 
-		if (my $dev = $subref->($_)) {
+		my $dev;
+		
+		if (defined $subref) {
+			$dev = $subref->($_);
+		} else {
+			$dev = $self->_valid_line($_);
+		}
+
+		if ($dev) {
 			$self->logger ('debug', 'DEBUG', "[$_] Finished parsing line, adding to queue.") if $self->{'options'}->{'debug'} >= 2;
 			push( @$lines, $dev );
 		}
@@ -412,7 +422,10 @@ sub get_logobj {
 
 =head2 get_sf_count
 
-Returns the total amount of lines found in the seedfile.
+Returns the total amount of lines found in the seedfile. Will return 0
+if the seedfile was not opened (because of an error or you didn't
+supply a seedfile to open.) Will also return 0 if you supplied an empty 
+seedfile. 
 
 =cut
 
@@ -425,7 +438,10 @@ sub get_sf_count {
 
 =head2 close_seedfile
 
-Close the seedfile.
+Close the seedfile and clear the internal file handle pointing to the
+seedfile. You should do this after you have read and processed all the
+lines. If you don't the seedfile is closed when the module goes out of
+scope.
 
 =cut
 
@@ -441,9 +457,9 @@ sub close_seedfile {
 	
 }
 
-=head2 _init
+=head2 mail_sender
 
-init function to validate arguments, not called directly.
+Sends out the e-mail of the faillog.
 
 =cut
 
@@ -561,23 +577,10 @@ sub _init {
 				}
 		}
 	);
-
-	#~ if (not defined $p{'software'}) {
-		#~ if ($p{'snmpversion'} == 2 and not defined $p{'community'}) {
-			#~ croak "Device::Discover, community argument must be passed when snmpversion argument set to 2 (default) and no software argument passed.";
-		#~ }
-#~ 
-		#~ if ($p{'snmpversion'} == 3 and (not defined $p{'snmpusername'} or not defined $p{'snmppassword'})) {
-			#~ croak "Device::Discover, snmpusername and snmppassword arguments must be passed (and not undef) when snmpversion argument set to 3 and no software argument passed.";
-		#~ }
-#~ 
-	#~ }
-#~ 
-	#~ if (defined $p{'software'} and defined $p{'protocol'}) {
-		#~ croak "Device::Discover, passing the software and protocol arguments just adds overhead to your script, there's nothing to discover if you know these already.";
-	#~ }
-#~ 
-	#~ $self->{'result'}->{'hostname'} = $p{hostname};
+	
+	if (defined $p{'mail'} and not defined $p{'faillog'} ) {
+		croak "Device::Utils, mail paramater given but faillog parameter missing.";
+	}
 
 	return \%p;
 }
