@@ -89,6 +89,7 @@ Set's up flexible logging using Log::Dispatch.
 								[valid_line_sub	=> $subref,]
 								[syslog			=> $syslog],
 								[mail			=> $mailhashref],
+								[combined_log	=> $combined_log],
 								[debuglog		=> $options->debuglog],
 								[infolog		=> $options->infolog],
 								[errorlog		=> $options->errorlog],
@@ -148,6 +149,10 @@ Takes a hash reference with mail sending details.
 			   'to' => 'support@example.net',
 			   'cc' => 'admins@example.net'
 			};
+
+=head3 combined_log
+
+File to log all messages from debug to alert.
 
 
 =head3 debuglog
@@ -547,6 +552,11 @@ sub _init {
 					optional => 1,
 					default => undef
 				},
+				combined_log => {
+					type	=> UNDEF | SCALAR,
+					optional => 1,
+					default => undef
+				},
 				debuglog => {
 					type	=> UNDEF | SCALAR,
 					optional => 1,
@@ -673,6 +683,16 @@ sub _setup_logging {
 			mode      => '>'
 		)
 	) if $self->{'options'}->{'faillog'};
+	
+	$log->add(
+		Log::Dispatch::FileShared->new(
+			name      => 'combined_log',
+			min_level => 'debug',
+			max_level => 'alert',
+			filename  => $self->{'options'}->{'combined_log'},
+			mode      => '>'
+		)
+	) if $self->{'options'}->{'combined_log'};
 	
 	
 	# Screen / CLI
