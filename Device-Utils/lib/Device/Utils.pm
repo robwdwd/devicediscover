@@ -391,7 +391,7 @@ sub logger {
 	
 	my $message;
 	
-	my $time = localtime;
+	my $time = gmtime;
 	
 	my $dt = '[' . $time->datetime. ']';
 	
