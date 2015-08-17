@@ -1,6 +1,7 @@
 package Device::Utils;
 
-use 5.006;
+use 5.010;
+
 use strict;
 use warnings FATAL => 'all';
 use Carp;
@@ -17,6 +18,8 @@ use Log::Dispatch::Log::Syslog::Fast;
 use Params::Validate qw( validate SCALAR UNDEF CODEREF HASHREF);
 
 use Text::Trim;
+
+use Time::Piece;
 
 =head1 NAME
 
@@ -388,6 +391,10 @@ sub logger {
 	
 	my $message;
 	
+	my $time = localtime;
+	
+	my $dt = '[' . $time->datetime. ']';
+	
 	if ($device) {
 		
 		return 0 unless (ref($device) eq "HASH");
@@ -398,9 +405,9 @@ sub logger {
 		$pre .= '[' . $device->{'os'} . '] ' 		if (defined $device->{'os'});
 		$pre .= '[' . $device->{'protocol'} . '] '	if (defined $device->{'protocol'});
 		
-		$message = sprintf ("%-7s: %s%s\n", $tag, $pre, $msg);
+		$message = sprintf ("%s %-7s: %s%s\n", $dt, $tag, $pre, $msg);
 	} else {
-		$message = sprintf ("%-7s: %s\n", $tag, $msg);
+		$message = sprintf ("%s %-7s: %s\n", $dt, $tag, $msg);
 	}
 		
 	$self->{'log'}->log( level => $level, message => $message);
