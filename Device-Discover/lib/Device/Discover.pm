@@ -1,6 +1,6 @@
 package Device::Discover;
 
-use 5.006;
+use 5.010;
 use strict;
 use warnings FATAL => 'all';
 
@@ -13,7 +13,7 @@ use IO::Socket::INET;
 
 use List::MoreUtils qw (any firstval);
 
-
+use Time::Piece;
 
 =head1 NAME
 
@@ -21,11 +21,11 @@ Device::Discover - Network device discovery module.
 
 =head1 VERSION
 
-Version 0.01
+Version 0.03
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.03';
 
 
 =head1 SYNOPSIS
@@ -497,11 +497,14 @@ sub _logger {
 	
 	$msg =~ s/\r|\n/ /g;
 	
+	my $time = gmtime;
+	my $dt = '[' . $time->datetime . '+00:00]';
+	
 	my $pre = '[' . $self->{'result'}->{'hostname'} . ']';
 	
 	$pre .= ' [' . $self->{'result'}->{'os'} . ']' if (defined $self->{'result'}->{'os'});
 
-	my $message = sprintf ("%-7s: [Device::Discover] %s %s\n", $tag, $pre, $msg);
+	my $message = sprintf ("%s %-7s: [Device::Discover] %s %s\n", $dt, $tag, $pre, $msg);
 	
 	
 	if (defined $self->{'logobj'}) {
@@ -564,6 +567,8 @@ sub _check_ssh {
 		return 0;
 	}
 	
+	$self->_logger ('debug', 'DEBUG', '[SSH Check] Checking if ssh is available.') if $self->{'options'}->{'debug'};
+	
 	my $line;
 	
 	do {
@@ -574,7 +579,7 @@ sub _check_ssh {
 		do  {
 			
 			my $s = IO::Select->new($sock);
-			my @ready = $s->can_read;
+			my @ready = $s->can_read(4);
 
 			my $bytes_read = sysread($sock, $buf, 1);
 
@@ -674,12 +679,16 @@ sub _check_telnet {
 		return 0;
 	}
 	
+	$self->_logger ('debug', 'DEBUG', '[Telnet Check] Checking if telnet is available.') if $self->{'options'}->{'debug'};
+	
 	my $buf;
 
 	my $s = IO::Select->new($sock);
-	my @ready = $s->can_read;
+	my @ready = $s->can_read(4);
 
 	my $bytes_read = sysread($sock, $buf, 1);
+	
+	$self->_logger ('debug', 'DEBUG', '[Telnet Check] Checking if telnet socket allows us to read a byte of data.') if $self->{'options'}->{'debug'};
 
 	if (not defined $bytes_read) {
 		next if $! == EAGAIN || $! == EWOULDBLOCK;

@@ -10,7 +10,7 @@ WriteMakefile(
     ABSTRACT_FROM    => 'lib/Device/Discover.pm',
     LICENSE          => 'Artistic_2_0',
     PL_FILES         => {},
-    MIN_PERL_VERSION => 5.006,
+    MIN_PERL_VERSION => 5.010,
     CONFIGURE_REQUIRES => {
         'ExtUtils::MakeMaker' => 0,
     },
@@ -18,6 +18,9 @@ WriteMakefile(
         'Test::More' => 0,
     },
     PREREQ_PM => {
+		'Params::Validate'					=> 0,
+		'Scalar::Util'						=> 0,
+		'List::MoreUtils'					=> 0
         #'ABC'              => 1.6,
         #'Foo::Bar::Module' => 5.0401,
     },

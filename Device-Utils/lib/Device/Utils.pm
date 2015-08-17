@@ -8,17 +8,13 @@ use Carp;
 
 use POSIX qw ( ceil ) ;
 
-use Data::Dumper;
-
 use Log::Dispatch;
 use Log::Dispatch::Screen;
 use Log::Dispatch::FileShared;
 use Log::Dispatch::Log::Syslog::Fast;
 
 use Params::Validate qw( validate SCALAR UNDEF CODEREF HASHREF);
-
 use Text::Trim;
-
 use Time::Piece;
 
 =head1 NAME
@@ -27,11 +23,11 @@ Device::Utils - The great new Device::Utils!
 
 =head1 VERSION
 
-Version 0.01
+Version 0.05
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.05';
 
 
 =head1 SYNOPSIS
