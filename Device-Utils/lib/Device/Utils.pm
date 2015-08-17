@@ -393,7 +393,7 @@ sub logger {
 	
 	my $time = gmtime;
 	
-	my $dt = '[' . $time->datetime. ']';
+	my $dt = '[' . $time->datetime . '+00:00]';
 	
 	if ($device) {
 		
