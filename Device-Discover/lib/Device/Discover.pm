@@ -579,7 +579,14 @@ sub _check_ssh {
 		do  {
 			
 			my $s = IO::Select->new($sock);
-			my @ready = $s->can_read(4);
+			my @ready = $s->can_read(20);
+			
+			if (!@ready) {
+				$self->_logger ('debug', 'DEBUG', "[SSH Check] Failed can_read, seems we can't read anything from the SSH port") if $self->{'options'}->{'debug'};
+				$self->_set_errormsg ("[SSH Check] Failed can_read, seems we can't read anything from the SSH port"); 
+				$sock->close;
+				return 0;
+			}
 
 			my $bytes_read = sysread($sock, $buf, 1);
 
@@ -684,7 +691,14 @@ sub _check_telnet {
 	my $buf;
 
 	my $s = IO::Select->new($sock);
-	my @ready = $s->can_read(4);
+	my @ready = $s->can_read(20);
+	
+	if (!@ready) {
+		$self->_logger ('debug', 'DEBUG', "[Telnet Check] Failed can_read, seems we can't read anything from the telnet port") if $self->{'options'}->{'debug'};
+		$self->_set_errormsg ("[Telnet Check] Failed can_read, seems we can't read anything from the telnet port"); 
+		$sock->close;
+		return 0;
+	}
 
 	my $bytes_read = sysread($sock, $buf, 1);
 	
