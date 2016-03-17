@@ -41,7 +41,6 @@ and discoveres the os (operating system) running on the device using SNMP sysDes
 										 ssh_os_ignore	=> 'VRP,OneOS',
 										 community		=> 'public',
 										 snmptimeout	=> 1,
-										 snmpversion	=> 2,
 										 debug			=> 1);
 
 	my $d = $device->discover;
@@ -67,7 +66,6 @@ Creates new Device::Discover Object.
 										[os				=> $os,]
 										[protocol		=> $protocol,]
 										[ssh_os_ignore	=> $ssh_os_ignore,]
-										[snmpversion	=> $snmpversion,]
 										[community		=> $community,]
 										[snmpusername	=> $snmpusername,]
 										[snmppassword	=> $snmppassword,]
@@ -94,10 +92,6 @@ protocol will be done.
 
 It makes no sense to set the protocol and os arguments, if you
 already know both of these you don't need this module.
-
-snmpversion by default is set to 2 for snmp v2c. If you set this to 2
-then you only need pass the community argument. For version 3 you must
-give the snmpusername and snmppasswords.
 
 snmptimeout defaults to 1 second.
 
@@ -208,19 +202,17 @@ sub get_sysdesc {
 	my $community = $self->{'options'}->{'community'};
 	
 	$community = $self->{'result'}->{'community'} if ($self->{'options'}->{'find_community'});
+	
+	# First try SNMP v2c
+	
+	$self->_logger ('debug', 'DEBUG', "[SNMP] Trying SNMP v2c") if $self->{'options'}->{'debug'};
+	
+	($session, $error) = Net::SNMP->session(	Hostname => $self->{'options'}->{'hostname'},
+												Version => 2,
+												Community => $community,
+												Timeout => $self->{'options'}->{'snmptimeout'});
 
-	if ($self->{'options'}->{'snmpversion'} == 3) {
-		($session, $error) = Net::SNMP->session(	Hostname => $self->{'options'}->{'hostname'},
-													Version => $self->{'options'}->{'snmpversion'},
-													Username => $self->{'options'}->{'snmpusername'},
-													Authpassword => $self->{'options'}->{'snmppassword'},
-													Timeout => $self->{'options'}->{'snmptimeout'});
-	} else {
-		($session, $error) = Net::SNMP->session(	Hostname => $self->{'options'}->{'hostname'},
-													Version => $self->{'options'}->{'snmpversion'},
-													Community => $community,
-													Timeout => $self->{'options'}->{'snmptimeout'});
-	}
+	
 
 	if (defined $session) {
 		my $result = $session->get_request( Varbindlist => [$sysDesc, $lldpDesc]);
@@ -232,18 +224,61 @@ sub get_sysdesc {
 
 			$self->{'result'}->{'sysdesc'} = $line;
 			$line =~ s/\r|\n/ /g;
-			$self->_logger ('debug', 'DEBUG', "[SNMP] [$line]") if $self->{'options'}->{'debug'} >= 2;
+			$self->_logger ('debug', 'DEBUG', "[SNMP] [v2c] [$line]") if $self->{'options'}->{'debug'} >= 2;
 	
 			return 1;
 		} else {
-			$self->_set_errormsg ('[SNMP] ' . $session->error);
+			$self->_logger ('debug', 'DEBUG', '[SNMP] [v2c] ' . $session->error) if $self->{'options'}->{'debug'};
 		}
 		$session->close;
 	} else {
-		$self->_set_errormsg ('[SNMP] ' . $error);
+		$self->_logger ('debug', 'DEBUG', '[SNMP] [v2c] ' . $error) if $self->{'options'}->{'debug'};
 	}
+	
+	
+	if (defined ($self->{'options'}->{'snmpusername'}) and defined ($self->{'options'}->{'snmppassword'})) {
+	
+		# Now try SNMPv3
+			
+		$self->_logger ('debug', 'DEBUG', "[SNMP] Trying SNMP v3") if $self->{'options'}->{'debug'};
+
+		$self->_logger ('debug', 'DEBUG', '[SNMP] [v3] Username: ' . $self->{'options'}->{'snmpusername'} . ', Password: ' .  $self->{'options'}->{'snmppassword'}) if $self->{'options'}->{'debug'} >= 2;	
+
+		($session, $error) = Net::SNMP->session(	Hostname => $self->{'options'}->{'hostname'},
+													Version => 3,
+													Username => $self->{'options'}->{'snmpusername'},
+													Authpassword => $self->{'options'}->{'snmppassword'},
+													Timeout => $self->{'options'}->{'snmptimeout'});
+
+
+		if (defined $session) {
+			my $result = $session->get_request( Varbindlist => [$sysDesc, $lldpDesc]);
+
+			if (defined($result)) {
+				$session->close;
+
+				my $line = $result->{$sysDesc} . " " . $result->{$lldpDesc};
+
+				$self->{'result'}->{'sysdesc'} = $line;
+				$line =~ s/\r|\n/ /g;
+				$self->_logger ('debug', 'DEBUG', "[SNMP] [v3] [$line]") if $self->{'options'}->{'debug'} >= 2;
+		
+				return 1;
+			} else {
+				$self->_logger ('debug', 'DEBUG', '[SNMP] [v3] ' . $session->error) if $self->{'options'}->{'debug'};
+			}
+			$session->close;
+		} else {
+			$self->_logger ('debug', 'DEBUG', '[SNMP] [v3] ' . $error) if $self->{'options'}->{'debug'};
+		}
+		
+	}
+
+	$self->_set_errormsg ('[SNMP] Unable to connect to device with SNMP.');
+
 	return 0;
 }
+
 
 =head2 get_community
 
@@ -419,11 +454,6 @@ sub _init {
 					type	=> SCALAR,
 					optional => 1,
 				},
-				snmpversion => {
-					type	=> SCALAR,
-					default => 2,
-					optional => 1,
-				},
 				snmpusername => {
 					type	=> SCALAR | UNDEF,
 					optional => 1,
@@ -458,17 +488,6 @@ sub _init {
 
 		}
 	);
-
-	if (not defined $p{'os'}) {
-		if ($p{'snmpversion'} == 2 and not defined $p{'community'}) {
-			croak "Device::Discover, community argument must be passed when snmpversion argument set to 2 (default) and no os argument passed.";
-		}
-
-		if ($p{'snmpversion'} == 3 and (not defined $p{'snmpusername'} or not defined $p{'snmppassword'})) {
-			croak "Device::Discover, snmpusername and snmppassword arguments must be passed (and not undef) when snmpversion argument set to 3 and no os argument passed.";
-		}
-
-	}
 
 	if (defined $p{'os'} and defined $p{'protocol'}) {
 		croak "Device::Discover, passing the os and protocol arguments just adds overhead to your script, there's nothing to discover if you know these already.";
