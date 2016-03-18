@@ -450,6 +450,10 @@ sub _init {
 					type => SCALAR | UNDEF,
 					optional => 1
 				},
+				snmpversion => {
+					type	=> SCALAR | UNDEF,
+					optional => 1,
+				},
 				community => {
 					type	=> SCALAR,
 					optional => 1,
