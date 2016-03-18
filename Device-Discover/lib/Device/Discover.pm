@@ -248,6 +248,7 @@ sub get_sysdesc {
 													Version => 3,
 													Username => $self->{'options'}->{'snmpusername'},
 													Authpassword => $self->{'options'}->{'snmppassword'},
+													Privpassword => $self->{'options'}->{'snmppriv'},
 													Timeout => $self->{'options'}->{'snmptimeout'});
 
 
@@ -461,12 +462,17 @@ sub _init {
 				snmpusername => {
 					type	=> SCALAR | UNDEF,
 					optional => 1,
-					depends	 => ['snmppassword']
+					depends	 => ['snmppassword','snmppriv']
 				},
 				snmppassword => {
 					type	=> SCALAR | UNDEF,
 					optional => 1,
-					depends	 => ['snmpusername'],
+					depends	 => ['snmpusername', 'snmppriv'],
+				},
+				snmppriv => {
+					type	=> SCALAR | UNDEF,
+					optional => 1,
+					depends	 => ['snmppassword', 'snmpusername'],
 				},
 				snmptimeout => {
 					type	=> SCALAR,
