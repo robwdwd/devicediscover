@@ -469,22 +469,22 @@ sub _init {
 				snmppassword => {
 					type	=> SCALAR | UNDEF,
 					optional => 1,
-					depends	 => ['snmpusername', 'snmppriv'],
+					depends	 => ['snmpusername', 'snmppriv', 'snmpauthproto'],
 				},
 				snmppriv => {
 					type	=> SCALAR | UNDEF,
 					optional => 1,
-					depends	 => ['snmppassword', 'snmpusername'],
+					depends	 => ['snmppassword', 'snmpusername', 'snmpprivproto'],
 				},
 				snmpauthproto => {
 					type	=> SCALAR | UNDEF,
 					optional => 1,
-					depends	 => ['snmppassword', 'snmpusername', 'privproto'],
+					depends	 => ['snmppassword', 'snmpusername', 'snmppriv', 'snmpprivproto'],
 				},
 				snmpprivproto => {
 					type	=> SCALAR | UNDEF,
 					optional => 1,
-					depends	 => ['snmppassword', 'snmpusername', 'snmppriv', 'authproto'],
+					depends	 => ['snmppassword', 'snmpusername', 'snmppriv', 'snmpauthproto'],
 				},		
 				snmptimeout => {
 					type	=> SCALAR,
