@@ -242,13 +242,15 @@ sub get_sysdesc {
 			
 		$self->_logger ('debug', 'DEBUG', "[SNMP] Trying SNMP v3") if $self->{'options'}->{'debug'};
 
-		$self->_logger ('debug', 'DEBUG', '[SNMP] [v3] Username: ' . $self->{'options'}->{'snmpusername'} . ', Password: ' .  $self->{'options'}->{'snmppassword'}) if $self->{'options'}->{'debug'} >= 2;	
+		$self->_logger ('debug', 'DEBUG', '[SNMP] [v3] Username: ' . $self->{'options'}->{'snmpusername'} . ', Password: ' .  $self->{'options'}->{'snmppassword'} . ', Priv: ' .  $self->{'options'}->{'snmppriv'}) if $self->{'options'}->{'debug'} >= 2;	
 
 		($session, $error) = Net::SNMP->session(	Hostname => $self->{'options'}->{'hostname'},
 													Version => 3,
 													Username => $self->{'options'}->{'snmpusername'},
 													Authpassword => $self->{'options'}->{'snmppassword'},
 													Privpassword => $self->{'options'}->{'snmppriv'},
+													Privprotocol  => $self->{'options'}->{'snmpprivproto'},
+													Authprotocol  => $self->{'options'}->{'snmpauthproto'},
 													Timeout => $self->{'options'}->{'snmptimeout'});
 
 
@@ -474,6 +476,16 @@ sub _init {
 					optional => 1,
 					depends	 => ['snmppassword', 'snmpusername'],
 				},
+				snmpauthproto => {
+					type	=> SCALAR | UNDEF,
+					optional => 1,
+					depends	 => ['snmppassword', 'snmpusername', 'privproto'],
+				},
+				snmpprivproto => {
+					type	=> SCALAR | UNDEF,
+					optional => 1,
+					depends	 => ['snmppassword', 'snmpusername', 'snmppriv', 'authproto'],
+				},		
 				snmptimeout => {
 					type	=> SCALAR,
 					default => 1
