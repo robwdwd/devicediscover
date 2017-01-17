@@ -480,7 +480,7 @@ sub mail_sender {
 		return;
 	}
 
-	use Mail::Sender;
+	use Email::Stuffer;
 
 	$self->logger ('debug', 'DEBUG', "Sending failed log file email.") if $self->{'options'}->{'debug'};
 
@@ -488,26 +488,13 @@ sub mail_sender {
 
 	eval {
 
-		open FAILLOG, $self->{'options'}->{'faillog'};
+		Email::Stuffer->from($self->{'options'}->{'mail'}->{'from'})
+			->to($self->{'options'}->{'mail'}->{'to'})
+			->subject($subject)
+			->text_body('Failure log is attached')
+			->attach_file($self->{'options'}->{'faillog'})
+			->send_or_die;
 
-		my $sender = new Mail::Sender ({
-			on_errors => 'die',
-			smtp => $self->{'options'}->{'mail'}->{'server'},
-			from => $self->{'options'}->{'mail'}->{'from'},
-			to => $self->{'options'}->{'mail'}->{'to'},
-			cc => $self->{'options'}->{'mail'}->{'cc'}
-			});
-
-		$sender->Open({subject => $subject});
-
-		# Get number of lines in file.
-		while(<FAILLOG>) {
-			trim $_;
-			$sender->SendLineEnc($_);
-		}
-
-		$sender->Close;
-		close FAILLOG;
 	};
 	if ($@) {
 		$self->logger ('error', 'ERROR', "Failed to send the failed log email: $@");
