@@ -205,7 +205,7 @@ sub get_sysdesc {
 
   # First try SNMP v2c
 
-  $self->_logger('debug', 'DEBUG', "[SNMP] Trying SNMP v2c") if $self->{'options'}->{'debug'};
+  $self->_logger('debug', "[SNMP] Trying SNMP v2c") if $self->{'options'}->{'debug'};
 
   ($session, $error) = Net::SNMP->session(
     Hostname  => $self->{'options'}->{'hostname'},
@@ -224,24 +224,24 @@ sub get_sysdesc {
 
       $self->{'result'}->{'sysdesc'} = $line;
       $line =~ s/\r|\n/ /g;
-      $self->_logger('debug', 'DEBUG', "[SNMP] [v2c] [$line]") if $self->{'options'}->{'debug'} >= 2;
+      $self>_logger('debug', "[SNMP] [v2c] [$line]") if $self->{'options'}->{'debug'} >= 2;
 
       return 1;
     } else {
-      $self->_logger('debug', 'DEBUG', '[SNMP] [v2c] ' . $session->error) if $self->{'options'}->{'debug'};
+      $self>_logger('debug', '[SNMP] [v2c] ' . $session->error) if $self->{'options'}->{'debug'};
     }
     $session->close;
   } else {
-    $self->_logger('debug', 'DEBUG', '[SNMP] [v2c] ' . $error) if $self->{'options'}->{'debug'};
+    $self>_logger('debug', '[SNMP] [v2c] ' . $error) if $self->{'options'}->{'debug'};
   }
 
   if (defined($self->{'options'}->{'snmpusername'}) and defined($self->{'options'}->{'snmppassword'})) {
 
     # Now try SNMPv3
 
-    $self->_logger('debug', 'DEBUG', "[SNMP] Trying SNMP v3") if $self->{'options'}->{'debug'};
+    $self>_logger('debug', "[SNMP] Trying SNMP v3") if $self->{'options'}->{'debug'};
 
-    $self->_logger('debug', 'DEBUG',
+    $self>_logger('debug',
           '[SNMP] [v3] User: '
         . $self->{'options'}->{'snmpusername'}
         . ', PW: '
@@ -271,15 +271,15 @@ sub get_sysdesc {
 
         $self->{'result'}->{'sysdesc'} = $line;
         $line =~ s/\r|\n/ /g;
-        $self->_logger('debug', 'DEBUG', "[SNMP] [v3] [$line]") if $self->{'options'}->{'debug'} >= 2;
+        $self>_logger('debug', "[SNMP] [v3] [$line]") if $self->{'options'}->{'debug'} >= 2;
 
         return 1;
       } else {
-        $self->_logger('debug', 'DEBUG', '[SNMP] [v3] ' . $session->error) if $self->{'options'}->{'debug'};
+        $self>_logger('debug', '[SNMP] [v3] ' . $session->error) if $self->{'options'}->{'debug'};
       }
       $session->close;
     } else {
-      $self->_logger('debug', 'DEBUG', '[SNMP] [v3] ' . $error) if $self->{'options'}->{'debug'};
+      $self>_logger('debug', '[SNMP] [v3] ' . $error) if $self->{'options'}->{'debug'};
     }
 
   }
@@ -328,7 +328,7 @@ sub get_community {
     if (defined($result)) {
       $session->close;
 
-      $self->_logger('debug', 'DEBUG', "[Community Discover] Found community in use on this device: $community") if $self->{'options'}->{'debug'};
+      $self>_logger('debug', "[Community Discover] Found community in use on this device: $community") if $self->{'options'}->{'debug'};
 
       $self->{'result'}->{'community'} = $community;
       return 1;
@@ -377,7 +377,7 @@ sub discover {
     }
 
     if (my $os = $self->parse_sysdesc()) {
-      $self->_logger('debug', 'DEBUG', "Discovered device is running $os as it's operating system.") if $self->{'options'}->{'debug'};
+      $self>_logger('debug', "Discovered device is running $os as it's operating system.") if $self->{'options'}->{'debug'};
       $self->{'result'}->{'os'} = $os;
     } else {
       $self->{'has_error'} = 1;
@@ -602,7 +602,7 @@ sub _check_ssh {
     and defined $self->{'options'}->{'ssh_os_ignore'}
     and any { $self->{'result'}->{'os'} eq $_ } (split ',', $self->{'options'}->{'ssh_os_ignore'}))
   {
-    $self->_logger('debug', 'DEBUG', '[SSH Check] Ignoring SSH for this device.') if $self->{'options'}->{'debug'};
+    $self>_logger('debug', '[SSH Check] Ignoring SSH for this device.') if $self->{'options'}->{'debug'};
     return 0;
   }
 
@@ -614,12 +614,12 @@ sub _check_ssh {
   );
 
   unless ($sock) {
-    $self->_logger('debug', 'DEBUG', "[SSH Check] $!") if $self->{'options'}->{'debug'};
+    $self>_logger('debug', "[SSH Check] $!") if $self->{'options'}->{'debug'};
     $self->_set_errormsg("[SSH Check] $!");
     return 0;
   }
 
-  $self->_logger('debug', 'DEBUG', '[SSH Check] Checking if ssh is available.') if $self->{'options'}->{'debug'};
+  $self>_logger('debug', '[SSH Check] Checking if ssh is available.') if $self->{'options'}->{'debug'};
 
   my $line;
 
@@ -634,7 +634,7 @@ sub _check_ssh {
       my @ready = $s->can_read(20);
 
       if (!@ready) {
-        $self->_logger('debug', 'DEBUG', "[SSH Check] Failed can_read, seems we can't read anything from the SSH port") if $self->{'options'}->{'debug'};
+        $self>_logger('debug', "[SSH Check] Failed can_read, seems we can't read anything from the SSH port") if $self->{'options'}->{'debug'};
         $self->_set_errormsg("[SSH Check] Failed can_read, seems we can't read anything from the SSH port");
         $sock->close;
         return 0;
@@ -644,12 +644,12 @@ sub _check_ssh {
 
       if (not defined $bytes_read) {
         next if $! == EAGAIN || $! == EWOULDBLOCK;
-        $self->_logger('debug', 'DEBUG', "[SSH Check] Socket Error: $!.") if $self->{'options'}->{'debug'};
+        $self>_logger('debug', "[SSH Check] Socket Error: $!.") if $self->{'options'}->{'debug'};
         $self->_set_errormsg("[SSH Check] Socket Error:" . $!);
         $sock->close;
         return 0;
       } elsif ($bytes_read == 0) {
-        $self->_logger('debug', 'DEBUG', '[SSH Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
+        $self>_logger('debug', '[SSH Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
         $self->_set_errormsg("[SSH Check] Remote host closed connection");
         $sock->close;
         return 0;
@@ -658,14 +658,14 @@ sub _check_ssh {
       $line .= $buf;
 
       if (substr($line, 0, 4) eq "SSH-" and length($line) > 255) {
-        $self->_logger('debug', 'DEBUG', '[SSH Check] SSH Version line too long.') if $self->{'options'}->{'debug'};
+        $self>_logger('debug', '[SSH Check] SSH Version line too long.') if $self->{'options'}->{'debug'};
         $self->_set_errormsg("[SSH Check] SSH Version line too long");
         $sock->close;
         return 0;
       }
 
       if (length($line) > 4 * 1024) {
-        $self->_logger('debug', 'DEBUG', '[SSH Check] SSH pre-version line too long.') if $self->{'options'}->{'debug'};
+        $self>_logger('debug', '[SSH Check] SSH pre-version line too long.') if $self->{'options'}->{'debug'};
         $self->_set_errormsg("[SSH Check] SSH Pre-version line too long");
         $sock->close;
         return 0;
@@ -677,11 +677,11 @@ sub _check_ssh {
 
   $line =~ s/\cM?\n$//;
 
-  $self->_logger('debug', 'DEBUG', "[SSH Check] Found SSH remote version string: $line") if $self->{'options'}->{'debug'};
+  $self>_logger('debug', "[SSH Check] Found SSH remote version string: $line") if $self->{'options'}->{'debug'};
 
   my ($remote_major, $remote_minor, $remote_version) = $line =~ /^SSH-(\d+)\.(\d+)-([^\n]+)$/;
 
-  $self->_logger('debug', 'DEBUG', "[SSH Check] Remote protocol version $remote_major.$remote_minor, remote software version $remote_version.")
+  $self>_logger('debug', "[SSH Check] Remote protocol version $remote_major.$remote_minor, remote software version $remote_version.")
     if $self->{'options'}->{'debug'};
 
   # Write version string back.
@@ -694,12 +694,12 @@ sub _check_ssh {
   #print STDERR "BUFF: $buf\n";
 
   if (not defined $bytes_read) {
-    $self->_logger('debug', 'DEBUG', "[SSH Check] Socket Error: $!") if $self->{'options'}->{'debug'};
+    $self>_logger('debug', "[SSH Check] Socket Error: $!") if $self->{'options'}->{'debug'};
     $self->_set_errormsg("[SSH Check] Socket Error: $!");
     $sock->close;
     return 0;
   } elsif ($bytes_read == 0) {
-    $self->_logger('debug', 'DEBUG', '[SSH Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
+    $self>_logger('debug', '[SSH Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
     $self->_set_errormsg('[SSH Check] Remote host closed connection.');
     $sock->close;
     return 0;
@@ -709,7 +709,7 @@ sub _check_ssh {
   # connection after the key exchange, maybe we need to get the login
   # prompt, but that's for another day...
   #
-  $self->_logger('debug', 'DEBUG', '[SSH Check] Found SSH running on this device.') if $self->{'options'}->{'debug'};
+  $self>_logger('debug', '[SSH Check] Found SSH running on this device.') if $self->{'options'}->{'debug'};
 
   $sock->shutdown(2);
   $sock->close;
@@ -736,12 +736,12 @@ sub _check_telnet {
   );
 
   unless ($sock) {
-    $self->_logger('debug', 'DEBUG', "[Telnet Check] $!") if $self->{'options'}->{'debug'};
+    $self>_logger('debug', "[Telnet Check] $!") if $self->{'options'}->{'debug'};
     $self->_set_errormsg($!);
     return 0;
   }
 
-  $self->_logger('debug', 'DEBUG', '[Telnet Check] Checking if telnet is available.') if $self->{'options'}->{'debug'};
+  $self>_logger('debug', '[Telnet Check] Checking if telnet is available.') if $self->{'options'}->{'debug'};
 
   my $buf;
 
@@ -749,7 +749,7 @@ sub _check_telnet {
   my @ready = $s->can_read(20);
 
   if (!@ready) {
-    $self->_logger('debug', 'DEBUG', "[Telnet Check] Failed can_read, seems we can't read anything from the telnet port") if $self->{'options'}->{'debug'};
+    $self>_logger('debug', "[Telnet Check] Failed can_read, seems we can't read anything from the telnet port") if $self->{'options'}->{'debug'};
     $self->_set_errormsg("[Telnet Check] Failed can_read, seems we can't read anything from the telnet port");
     $sock->close;
     return 0;
@@ -757,22 +757,22 @@ sub _check_telnet {
 
   my $bytes_read = sysread($sock, $buf, 1);
 
-  $self->_logger('debug', 'DEBUG', '[Telnet Check] Checking if telnet socket allows us to read a byte of data.') if $self->{'options'}->{'debug'};
+  $self>_logger('debug', '[Telnet Check] Checking if telnet socket allows us to read a byte of data.') if $self->{'options'}->{'debug'};
 
   if (not defined $bytes_read) {
     next if $! == EAGAIN || $! == EWOULDBLOCK;
-    $self->_logger('debug', 'DEBUG', "[Telnet Check] Socket Error: $!") if $self->{'options'}->{'debug'};
+    $self>_logger('debug', "[Telnet Check] Socket Error: $!") if $self->{'options'}->{'debug'};
     $self->_set_errormsg("[Telnet Check] Socket Error:" . $!);
     $sock->close;
     return 0;
   } elsif ($bytes_read == 0) {
-    $self->_logger('debug', 'DEBUG', '[Telnet Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
+    $self>_logger('debug', '[Telnet Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
     $self->_set_errormsg("[Telnet Check] Remote host closed connection");
     $sock->close;
     return 0;
   }
 
-  $self->_logger('debug', 'DEBUG', '[Telnet Check] Found Telnet running on this device.') if $self->{'options'}->{'debug'};
+  $self>_logger('debug', '[Telnet Check] Found Telnet running on this device.') if $self->{'options'}->{'debug'};
 
   $sock->shutdown(2);
   $sock->close;
