@@ -169,6 +169,7 @@ sub parse_sysdesc {
 	return 'EOS'		if ( $descr =~ m/Arista Networks/);
 	return 'TiMOS'		if ( $descr =~ m/TiMOS/);
 	return 'VRP'		if ( $descr =~ m/Huawei/);
+	return 'ArbOS'		if ( $descr =~ m/Peakflow/i);
 	return 'IOS-XE'		if ( $descr =~ m/IOS-XE/ );
 	return 'IOS-XR'		if ( $descr =~ m/IOS XR/ );
 	return 'IOS'		if ( $descr =~ m/IOS/ );
