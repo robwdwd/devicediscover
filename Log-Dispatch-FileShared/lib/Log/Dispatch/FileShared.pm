@@ -1,276 +1,262 @@
 package Log::Dispatch::FileShared;
+
 # $Id: FileShared.pm,v 1.3 2007/02/03 18:24:11 cmanley Exp $
 use strict;
 use Carp;
 use Fcntl qw(:DEFAULT :flock);
-use Params::Validate qw(validate_with SCALAR BOOLEAN); Params::Validate::validation_options('allow_extra' => 1);
+use Params::Validate qw(validate_with SCALAR BOOLEAN);
+Params::Validate::validation_options('allow_extra' => 1);
 use Scalar::Util ();
-use Time::HiRes ();
+use Time::HiRes  ();
 use base qw( Log::Dispatch::Output );
 our $VERSION = sprintf '%d.%02d', q|$Revision: 1.3 $| =~ m/ (\d+) \. (\d+) /xg;
 
-
-
 our $MOD_PERL;
-unless(defined($MOD_PERL)) {
-	$MOD_PERL = 0; # default == no mod_perl
-	if (exists($ENV{MOD_PERL})) {
-		# mod_perl handlers may run system() on other scripts, so also check %INC.
-		if (exists($ENV{MOD_PERL_API_VERSION}) && ($ENV{MOD_PERL_API_VERSION} == 2) && $INC{'Apache2/RequestRec.pm'}) {
-			$MOD_PERL = 2;
-		} elsif ($INC{'Apache.pm'}) {
-			$MOD_PERL = 1;
-		}
-	}
+unless (defined($MOD_PERL)) {
+  $MOD_PERL = 0;    # default == no mod_perl
+  if (exists($ENV{MOD_PERL})) {
+
+    # mod_perl handlers may run system() on other scripts, so also check %INC.
+    if (exists($ENV{MOD_PERL_API_VERSION}) && ($ENV{MOD_PERL_API_VERSION} == 2) && $INC{'Apache2/RequestRec.pm'}) {
+      $MOD_PERL = 2;
+    } elsif ($INC{'Apache.pm'}) {
+      $MOD_PERL = 1;
+    }
+  }
 }
-
-
-
 
 sub new {
-	my $proto = shift;
-	my %p = @_;
-	my $class = ref($proto) || $proto;
-	my $self = bless({}, $class);
-	$self->_basic_init(%p);
-    $self->_init(%p);
-    
-    $self->{pid} = $$; # To stop destroying file handle when forked.
+  my $proto = shift;
+  my %p     = @_;
+  my $class = ref($proto) || $proto;
+  my $self  = bless({}, $class);
+  $self->_basic_init(%p);
+  $self->_init(%p);
 
-    # Open the handle here otherwise file isn't open until
-    # first log which means we will never truncate a file if mode is not append.
-    $self->_get_handle;
+  $self->{pid} = $$;    # To stop destroying file handle when forked.
 
-	return $self;
+  # Open the handle here otherwise file isn't open until
+  # first log which means we will never truncate a file if mode is not append.
+  $self->_get_handle;
+
+  return $self;
 }
-
-
 
 sub DESTROY {
-    my $self = shift;
-    $self->_close_handle();
+  my $self = shift;
+  $self->_close_handle();
 }
-
-
 
 sub _init {
-    my $self = shift;
-    my %p = validate_with(
-    	'params'	=> \@_,
-    	'spec'		=> {
-    		'filename'  => { 'type' => SCALAR },
-    		'mode'      => { 'type' => SCALAR,  'default' => '>>', 'regex' => qr/^>{1,2}$/ },
-			'perms'	    => { 'type' => SCALAR,  'default' => 0666 },
-			'umask'	    => { 'type' => SCALAR,  'optional' => 1 },
-			'flock'     => { 'type' => BOOLEAN, 'default' => 1 },
-			'autoflush' => { 'type' => BOOLEAN, 'default' => 1 },
-			'close_after_write' => { 'type' => BOOLEAN, 'default' => 0 },
-			'close_after_modperl_request' => { 'type' => BOOLEAN, 'default' => 0 },
-		},
-		'allow_extra' => 1,
-	);
-	$self->{'filename'}  = $p{'filename'};
-	$self->{'perms'}     = $p{'perms'} | 0200; # Make sure that at least this process can write to the file.
-	$self->{'umask'}     = $p{'umask'};
-	$self->{'flock'}     = $p{'flock'};
-	$self->{'autoflush'} = $p{'autoflush'};
-	$self->{'close_after_write'} = $p{'close_after_write'};
-	if ($self->{'close_after_write'}) {
-		$self->{'mode'} = '>>';
-	}
-    else {
-		$self->{'mode'} = $p{'mode'};
+  my $self = shift;
+  my %p    = validate_with(
+    'params' => \@_,
+    'spec'   => {
+      'filename' => { 'type' => SCALAR },
+      'mode'     => { 'type' => SCALAR, 'default' => '>>', 'regex' => qr/^>{1,2}$/ },
+      'perms'                       => { 'type' => SCALAR,  'default'  => 0666 },
+      'umask'                       => { 'type' => SCALAR,  'optional' => 1 },
+      'flock'                       => { 'type' => BOOLEAN, 'default'  => 1 },
+      'autoflush'                   => { 'type' => BOOLEAN, 'default'  => 1 },
+      'close_after_write'           => { 'type' => BOOLEAN, 'default'  => 0 },
+      'close_after_modperl_request' => { 'type' => BOOLEAN, 'default'  => 0 },
+    },
+    'allow_extra' => 1,
+  );
+  $self->{'filename'}          = $p{'filename'};
+  $self->{'perms'}             = $p{'perms'} | 0200;        # Make sure that at least this process can write to the file.
+  $self->{'umask'}             = $p{'umask'};
+  $self->{'flock'}             = $p{'flock'};
+  $self->{'autoflush'}         = $p{'autoflush'};
+  $self->{'close_after_write'} = $p{'close_after_write'};
+
+  if ($self->{'close_after_write'}) {
+    $self->{'mode'} = '>>';
+  } else {
+    $self->{'mode'} = $p{'mode'};
+  }
+  if ($p{'close_after_modperl_request'}) {
+    {
+      if ($self->{'close_after_write'}) {
+        local $Carp::CarpLevel = $Carp::CarpLevel + 1;
+        carp("Option 'close_after_modperl_request' ignored because 'close_after_write' is true.");
+        last;
+      }
+      unless ($MOD_PERL) {
+        local $Carp::CarpLevel = $Carp::CarpLevel + 1;
+        carp("Option 'close_after_modperl_request' ignored because mod_perl was not detected.");
+        last;
+      }
+      if ($MOD_PERL == 2) {
+
+        # Check that the request object can be fetched. Requires 'SetHandler perl-script' or 'PerlOptions +GlobalRequest'
+        eval {
+          require Apache2::RequestUtil;
+          Apache2::RequestUtil->request();
+        };
+        if ($@) {
+          local $Carp::CarpLevel = $Carp::CarpLevel + 1;
+          croak("Can't use option 'close_after_modperl_request' (requires 'SetHandler perl-script' or 'PerlOptions +GlobalRequest'): $@");
+        }
+      } elsif ($MOD_PERL > 2) {
+        die("Fix me because I don't support mod_perl $MOD_PERL yet.");
+      }
+
+      # This is a boolean switch. This is used to check if the handler as already been pushed.
+      # This technique is used instead of get_handlers() because the latter segfaults with anonymous subs (in mod_perl 2.02)
+      $self->{'modperl_cleanup_handler_pushed'} = 0;
+
+      # Create cleanup code ref.
+      # Use a weak self reference so that a circular reference memory leak isn't caused.
+      # See also http://www.perl.com/pub/a/2002/08/07/proxyobject.html?page=2
+      my $weakself = $self;
+      Scalar::Util::weaken($weakself);
+      $self->{'modperl_cleanup_handler'} = sub {
+        if (defined($weakself)) {    # Will be undef if $self was garbage collected, which is ok.
+          $weakself->_close_handle();
+          $weakself->{'modperl_cleanup_handler_pushed'} = 0;
+        }
+        }
     }
-	if ($p{'close_after_modperl_request'}) {
-		{
-			if ($self->{'close_after_write'}) {
-				local $Carp::CarpLevel = $Carp::CarpLevel + 1;
-				carp("Option 'close_after_modperl_request' ignored because 'close_after_write' is true.");
-				last;
-			}
-			unless($MOD_PERL) {
-				local $Carp::CarpLevel = $Carp::CarpLevel + 1;
-				carp("Option 'close_after_modperl_request' ignored because mod_perl was not detected.");
-				last;
-			}
-			if ($MOD_PERL == 2) {
-				# Check that the request object can be fetched. Requires 'SetHandler perl-script' or 'PerlOptions +GlobalRequest'
-				eval {
-					require Apache2::RequestUtil;
-					Apache2::RequestUtil->request();
-				};
-				if ($@) {
-					local $Carp::CarpLevel = $Carp::CarpLevel + 1;
-					croak("Can't use option 'close_after_modperl_request' (requires 'SetHandler perl-script' or 'PerlOptions +GlobalRequest'): $@");
-				}
-			}
-			elsif ($MOD_PERL > 2) {
-				die("Fix me because I don't support mod_perl $MOD_PERL yet.");
-			}
-
-			# This is a boolean switch. This is used to check if the handler as already been pushed.
-			# This technique is used instead of get_handlers() because the latter segfaults with anonymous subs (in mod_perl 2.02)
-			$self->{'modperl_cleanup_handler_pushed'} = 0;
-
-			# Create cleanup code ref.
-			# Use a weak self reference so that a circular reference memory leak isn't caused.
-			# See also http://www.perl.com/pub/a/2002/08/07/proxyobject.html?page=2
-			my $weakself = $self;
-			Scalar::Util::weaken($weakself);
-			$self->{'modperl_cleanup_handler'} = sub {
-				if (defined($weakself)) { # Will be undef if $self was garbage collected, which is ok.
-					$weakself->_close_handle();
-					$weakself->{'modperl_cleanup_handler_pushed'} = 0;
-				}
-			}
-		}
-	}
+  }
 }
-
-
-
 
 sub log_message {
-	my $self = shift;
-	my %p = @_;
-	my $h = $self->_get_handle();
-	my $use_flock = $self->{'flock'};
-	if ($use_flock) {
-		unless($self->_lock_handle($h)) {
-			# Oops failed to aquire lock.
-			# If it was important, then at least it will appear in STDERR.
-			warn($p{'message'});
-			return;
-		}
-	}
-	print $h $p{'message'};
-	if ($self->{'close_after_write'}) {
-		$self->_close_handle(); # automatically unlocks too
-	}
-	elsif($use_flock) {
-		flock($h, LOCK_UN); # automatically flushes too.
-	}
+  my $self      = shift;
+  my %p         = @_;
+  my $h         = $self->_get_handle();
+  my $use_flock = $self->{'flock'};
+  if ($use_flock) {
+    unless ($self->_lock_handle($h)) {
+
+      # Oops failed to aquire lock.
+      # If it was important, then at least it will appear in STDERR.
+      warn($p{'message'});
+      return;
+    }
+  }
+  print $h $p{'message'};
+  if ($self->{'close_after_write'}) {
+    $self->_close_handle();    # automatically unlocks too
+  } elsif ($use_flock) {
+    flock($h, LOCK_UN);        # automatically flushes too.
+  }
 }
-
-
-
 
 sub _get_handle {
-    my $self = shift;
-    my $h = $self->{'h'};
-    unless($h) {
-    	my $filename = $self->{'filename'};
-    	my $new_umask = $self->{'umask'};
-    	my $old_umask;
-    	if (defined($new_umask)) {
-    		$old_umask = umask($new_umask);
-    	}
-    	
-    	my $mode = O_WRONLY | O_CREAT;
-        if ($self->{'mode'} eq '>>') {
-            $mode |= O_APPEND;
-        } elsif ($$ == $self->{pid}) {
-            $mode |= O_TRUNC; # Added O_TRUNC otherwise file just gets appended.
-        }
+  my $self = shift;
+  my $h    = $self->{'h'};
+  unless ($h) {
+    my $filename  = $self->{'filename'};
+    my $new_umask = $self->{'umask'};
+    my $old_umask;
+    if (defined($new_umask)) {
+      $old_umask = umask($new_umask);
+    }
 
-    	
+    my $mode = O_WRONLY | O_CREAT;
+    if ($self->{'mode'} eq '>>') {
+      $mode |= O_APPEND;
+    } elsif ($$ == $self->{pid}) {
+      $mode |= O_TRUNC;    # Added O_TRUNC otherwise file just gets appended.
+    }
 
-    	my $rc = sysopen($h, $filename, $mode, $self->{'perms'});
-    	if (defined($old_umask)) {
-    		umask($old_umask);
-    	}
-    	unless($rc) {
-			die(sprintf('Failed to open("%s%s"): %s', $self->{'mode'}, $filename, $!));
-		}
-		if ($self->{'autoflush'}) {
-			my $oldh = select($h); $| = 1; select($oldh);
-		}
-		if ($MOD_PERL && (my $cleanup_handler = $self->{'modperl_cleanup_handler'}) && !$self->{'modperl_cleanup_handler_pushed'}) {
-			if ($MOD_PERL == 2) {
-				# Requires 'SetHandler perl-script' or 'PerlOptions +GlobalRequest'
-				Apache2::RequestUtil->request()->push_handlers('PerlCleanupHandler' => $cleanup_handler);
-			}
-			elsif ($MOD_PERL == 1) {
-				Apache->request()->register_cleanup($cleanup_handler);
-			}
-			else {
-				die("Fix me because I don't support mod_perl $MOD_PERL yet.");
-			}
-			$self->{'modperl_cleanup_handler_pushed'} = 1;
-		}
-		$self->{'h'} = $h;
-	}
-	return $h;
+    my $rc = sysopen($h, $filename, $mode, $self->{'perms'});
+    if (defined($old_umask)) {
+      umask($old_umask);
+    }
+    unless ($rc) {
+      die(sprintf('Failed to open("%s%s"): %s', $self->{'mode'}, $filename, $!));
+    }
+    if ($self->{'autoflush'}) {
+      my $oldh = select($h);
+      $| = 1;
+      select($oldh);
+    }
+    if ($MOD_PERL && (my $cleanup_handler = $self->{'modperl_cleanup_handler'}) && !$self->{'modperl_cleanup_handler_pushed'}) {
+      if ($MOD_PERL == 2) {
+
+        # Requires 'SetHandler perl-script' or 'PerlOptions +GlobalRequest'
+        Apache2::RequestUtil->request()->push_handlers('PerlCleanupHandler' => $cleanup_handler);
+      } elsif ($MOD_PERL == 1) {
+        Apache->request()->register_cleanup($cleanup_handler);
+      } else {
+        die("Fix me because I don't support mod_perl $MOD_PERL yet.");
+      }
+      $self->{'modperl_cleanup_handler_pushed'} = 1;
+    }
+    $self->{'h'} = $h;
+  }
+  return $h;
 }
-
-
 
 sub _close_handle {
-	my $self = shift;
-	if (my $h = $self->{'h'}) {
-		close($h);
-		undef($self->{'h'});
-	}
+  my $self = shift;
+  if (my $h = $self->{'h'}) {
+    close($h);
+    undef($self->{'h'});
+  }
 }
-
-
 
 sub _lock_handle {
-	my $self = shift;
-	my $h = shift;
-    # First try to get a non-blocking lock.
-	# Only if that fails, try a blocking lock in an eval which is slower.
-	unless(flock($h, LOCK_EX | LOCK_NB)) {
-		{
-			if ($SIG{ALRM} && ($SIG{ALRM} ne 'DEFAULT')) {
-				# This is a dilemma.
-				# Not locking could cause the log file to be corrupted.
-				# The caller has probably called alarm(), and calling it here could disrupt the caller's alarm() call.
-				# First try a short loop with 1ms sleeps to get a non-blocking loop.
-				# If that doesn't work, then try a blocking lock with a timeout.
-				my $locked = 0;
-				for (my $i=0; $i<5; $i++) {
-					Time::HiRes::usleep(1000);
-					if (flock($h, LOCK_EX | LOCK_NB)) {
-						# Yippie! It worked.
-						$locked = 1;
-						last;
-					}
-				}
-				if ($locked) {
-					last;
-				}
-				warn("Setting local \$SIG{ALRM} even though it has been set already.");
-			}
-			eval {
-    			local $SIG{ALRM} = sub { die(__PACKAGE__ . ".ALRM\n"); };
-    			# Wait practically long enough, between 1 and 2 seconds.
-    			# Any shorter can cause a premature timeout.
-    			# Any longer can help cause a DoS if too may processes have to wait too long.
-    			alarm 2;
-    			flock($h, LOCK_EX);
-    			alarm 0;
-   			};
-   			alarm 0;
-   			if ($@) {
-   				$self->_close_handle();
-   				if ($@ eq __PACKAGE__ . ".ALRM\n") {
-   					# This is a dilemma too.
-					warn(sprintf("Timeout waiting for lock on '%s'.", $self->{'filename'}));
-					return 0;
-				}
-				else {
-					die($@);
-				}
-			}
-		}
-	}
-	# Just in case there was an append while we waited for the lock.
-	seek($h,0,2);
-	return 1;
+  my $self = shift;
+  my $h    = shift;
+
+  # First try to get a non-blocking lock.
+  # Only if that fails, try a blocking lock in an eval which is slower.
+  unless (flock($h, LOCK_EX | LOCK_NB)) {
+    {
+      if ($SIG{ALRM} && ($SIG{ALRM} ne 'DEFAULT')) {
+
+        # This is a dilemma.
+        # Not locking could cause the log file to be corrupted.
+        # The caller has probably called alarm(), and calling it here could disrupt the caller's alarm() call.
+        # First try a short loop with 1ms sleeps to get a non-blocking loop.
+        # If that doesn't work, then try a blocking lock with a timeout.
+        my $locked = 0;
+        for (my $i = 0 ; $i < 5 ; $i++) {
+          Time::HiRes::usleep(1000);
+          if (flock($h, LOCK_EX | LOCK_NB)) {
+
+            # Yippie! It worked.
+            $locked = 1;
+            last;
+          }
+        }
+        if ($locked) {
+          last;
+        }
+        warn("Setting local \$SIG{ALRM} even though it has been set already.");
+      }
+      eval {
+        local $SIG{ALRM} = sub { die(__PACKAGE__ . ".ALRM\n"); };
+
+        # Wait practically long enough, between 1 and 2 seconds.
+        # Any shorter can cause a premature timeout.
+        # Any longer can help cause a DoS if too may processes have to wait too long.
+        alarm 2;
+        flock($h, LOCK_EX);
+        alarm 0;
+      };
+      alarm 0;
+      if ($@) {
+        $self->_close_handle();
+        if ($@ eq __PACKAGE__ . ".ALRM\n") {
+
+          # This is a dilemma too.
+          warn(sprintf("Timeout waiting for lock on '%s'.", $self->{'filename'}));
+          return 0;
+        } else {
+          die($@);
+        }
+      }
+    }
+  }
+
+  # Just in case there was an append while we waited for the lock.
+  seek($h, 0, 2);
+  return 1;
 }
-
-
 
 1;
 
