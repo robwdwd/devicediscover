@@ -15,7 +15,8 @@ use Log::Dispatch::Log::Syslog::Fast;
 
 use Params::Validate qw( validate SCALAR UNDEF CODEREF HASHREF);
 use Text::Trim;
-use Time::Piece;
+
+use File::Basename;
 
 =head1 NAME
 
@@ -611,7 +612,7 @@ sub _setup_logging {
       $log->add(
         Log::Dispatch::Log::Syslog::Fast->new(
           min_level => 'debug',
-          name      => $_,
+          name      => basename($0),
           transport => $self->{'options'}->{'syslog'}->{$_}->{'protocol'},
           facility  => $self->{'options'}->{'syslog'}->{$_}->{'facility'},
           severity  => $self->{'options'}->{'syslog'}->{$_}->{'severity'},
