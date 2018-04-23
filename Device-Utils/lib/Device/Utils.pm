@@ -370,14 +370,14 @@ sub logger {
 
   my $self = shift;
 
-  my ($level, $tag, $device, $msg);
+  my ($level, $device, $msg);
 
-  if (@_ == 3) {
-    ($level, $tag, $msg) = @_;
+  if (@_ == 2) {
+    ($level, $msg) = @_;
   }
 
-  if (@_ == 4) {
-    ($level, $tag, $device, $msg) = @_;
+  if (@_ == 3) {
+    ($level, $device, $msg) = @_;
   }
 
   return 0 unless ($msg);    # Message is empty.
@@ -396,9 +396,9 @@ sub logger {
     $pre .= '[' . $device->{'os'} . '] '       if (defined $device->{'os'});
     $pre .= '[' . $device->{'protocol'} . '] ' if (defined $device->{'protocol'});
 
-    $message = sprintf("%-7s: %s%s\n", $tag, $pre, $msg);
+    $message = sprintf("%s%s\n", $pre, $msg);
   } else {
-    $message = sprintf("%-7s: %s\n", $tag, $msg);
+    $message = sprintf("%s\n", $msg);
   }
 
   $self->{'log'}->log(level => $level, message => $message);
