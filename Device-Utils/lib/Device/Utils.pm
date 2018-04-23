@@ -39,46 +39,46 @@ Set's up flexible logging using Log::Dispatch.
 
     use Device::Utils;
 
-	my $dutils =  Device::Utils->new(	
+	my $dutils =  Device::Utils->new(
 									seedfile		=> 'seed.txt',
 									valid_line_sub	=> \&parse_line,
 									errorlog		=> 'errors.log',
 									faillog			=> 'fail.log'
 									);
-									
+
 	my ($queue_size, $processes) = $dutils->fork_counts(5, 10);
-	
+
 	# Create Parallel::ForkManager with number of processes.
 	#
 	my $pm = Parallel::ForkManager->new($processes);
 
 	while ((my $devices = $dutils->readNlines($queue_size))) {
-		
+
 		$pm->start() and do next; # do the fork
-		
+
 		while (@$devices) {
 			my $d = shift @$devices;
 			print 'Found device: ' . $d->{'hostname'} . "\n";
 		};
 		$pm->finish(1);
 	}
-	
+
 	$pm->wait_all_children;
-	
+
 	$dutils->close_seedfile(); # Will close when module goes out of scope
 							   # but might want to close earlier.
-							   
+
 	sub parse_line {
 		$line = shift;
 		return 0 unless $line; # Empty line
-		
+
 		if (not ($line =~ /^([\d\w\-]+)\.(\w+);([\w-]+)$/)) {
 			$dutils->logger ('alert', 'FAILED', "[$line] Seed line in wrong format for device.");
 			return 0;
 		}
-		
+
 		return {'hostname' => "$1.$2", 'os' => $3, 'city' => $2} ;
-	
+
 	}
 
 =head1 new Device::Utils
@@ -133,10 +133,10 @@ Takes a hash reference to syslog servers.
 						  'severity' => 'err',
 						  'protocol' => 'udp'
 						}
-						
+
 				....
 			};
-			
+
 =head3 mail
 
 Takes a hash reference with mail sending details.
@@ -191,11 +191,11 @@ sub new {
 		log => undef,
 		options => {}
 	};
-	
+
 	bless($self, $class);
 
 	$self->{'options'} = $self->_init(%options);
-	
+
 	# Setup logging
 	#
 	$self->{'log'} = $self->_setup_logging();
@@ -203,26 +203,26 @@ sub new {
 	# Open the seedfile and count the number of lines.
 	#
 	if ($self->{'options'}->{'seedfile'}) {
-		
+
 		my $fh = $self->_open_seedfile();
 
 		# Get number of lines in file.
 		while(<$fh>) {};
 		$self->{'sf_count'} = $.;
 		seek $fh, 0, 0; # Rewind
-		
+
 		$self->{'sfh'} = $fh;
-		
+
 		$self->logger ('warning', 'WARNING', 'Seedfile contents are empty, this is probably not what you want.') if ($self->{'sf_count'} <= 0);
 	}
-	
+
 	# Set valid line code ref here, Params::Validate should check it's
 	# actually a coderef.
-	
+
 	if ($self->{'options'}->{'valid_line_sub'}) {
 		$self->{'vlsubref'} = $self->{'options'}->{'valid_line_sub'};
 	}
-	
+
 	return($self);
 }
 
@@ -241,16 +241,16 @@ Returns the number of process and queue size.
 =cut
 
 sub fork_counts {
-	
+
 	my $self = shift;
 	my ($processes, $queue_size) = @_;
-	
+
 	my $total_lines = $self->{'sf_count'};
-	
+
 	return 0 unless $total_lines;
-	
+
 	$processes = 1 if $processes <= 0; # Can't have 0 or negative processes.
-	
+
 	# Check if the total lines is less than the maximum processes, if so divide
 	# by three.
 	#
@@ -258,14 +258,14 @@ sub fork_counts {
 		$processes = ceil  ($total_lines / 3) || 1; # Divide the total lines by 3, if 0 (less than 3 lines) set to 1.
 		$self->logger ('notice', 'NOTICE', "Changing process count to be a third of total lines ($total_lines) in seedfile, process count now $processes.");
 	}
-	
+
 	# Check if total lines in seedfile divided by number of processes is less
 	# than the devices per process, and if so set devices by process to the
 	# number of lines divided by process.
-	
+
 	if ($total_lines / $processes < $queue_size) {
 		$queue_size = ceil ($total_lines / $processes);
-		
+
 		# If devices per process works out to be one, let's reduce the number
 		# of processes further so that devices per process is at least 3.
 		#
@@ -276,9 +276,9 @@ sub fork_counts {
 		} else {
 			$self->logger ('notice', 'NOTICE', "Setting queue size to $queue_size (with $processes process) for better performance. Total lines $total_lines / $processes = $queue_size.");
 		}
-		
+
 	}
-	
+
 	return ($processes, $queue_size);
 }
 
@@ -289,7 +289,7 @@ sub fork_counts {
 Takes $count lines as parameter
 
 	while ((my $devices = $dutils->readNlines(10))) {
-		
+
 		$pm->start() and do next; # do the fork
 		do_devices($xdevices);
 		$pm->finish(1);
@@ -304,28 +304,28 @@ head3
 =cut
 
 sub readNlines {
-	
+
 	my $self = shift;
 	my $count = shift;
 
 	my $fh = $self->{'sfh'};
 	my $subref = $self->{'vlsubref'};
-	
+
 	my $lines = [];
-	
-	
-	
+
+
+
 	unless ($fh) {
 		$self->logger ('error', 'ERROR', 'Seedfile not open, returning empty list.');
 		return 0;
 	}
-	
+
 	while(<$fh>) {
 
 		trim $_;
 
 		my $dev;
-		
+
 		if (defined $subref) {
 			$dev = $subref->($_);
 		} else {
@@ -336,7 +336,7 @@ sub readNlines {
 			$self->logger ('debug', 'DEBUG', "[$_] Finished parsing line, adding to queue.") if $self->{'options'}->{'debug'} >= 2;
 			push( @$lines, $dev );
 		}
-		
+
 		last if @$lines == $count;
 	}
 
@@ -368,48 +368,48 @@ See http://search.cpan.org/~drolsky/Log-Dispatch/lib/Log/Dispatch.pm#LOG_LEVELS 
 =cut
 
 sub logger {
-	
+
 	my $self = shift;
-	
+
 	my ($level, $tag, $device, $msg);
-	
+
 	if (@_ == 3) {
 		($level, $tag, $msg) = @_;
 	}
-	
+
 	if (@_ == 4) {
 		($level, $tag, $device, $msg) = @_;
 	}
 
-	return 0 unless ($msg); # Message is empty. 
+	return 0 unless ($msg); # Message is empty.
 
 	$msg =~ s/\r|\n/ /g;
-	
+
 	my $message;
-	
+
 	my $time = gmtime;
-	
+
 	my $dt = '[' . $time->datetime . '+00:00]';
-	
+
 	if ($device) {
-		
+
 		return 0 unless (ref($device) eq "HASH");
-	
+
 		my $pre = '';
-	
+
 		$pre .= '[' . $device->{'hostname'} . '] '	if (defined $device->{'hostname'});
 		$pre .= '[' . $device->{'os'} . '] ' 		if (defined $device->{'os'});
 		$pre .= '[' . $device->{'protocol'} . '] '	if (defined $device->{'protocol'});
-		
+
 		$message = sprintf ("%s %-7s: %s%s\n", $dt, $tag, $pre, $msg);
 	} else {
 		$message = sprintf ("%s %-7s: %s\n", $dt, $tag, $msg);
 	}
-		
+
 	$self->{'log'}->log( level => $level, message => $message);
-	
+
 	return 1;
-	
+
 }
 
 =head2 get_logobj
@@ -421,26 +421,26 @@ the logger method.
 =cut
 
 sub get_logobj {
-	
+
 	my $self = shift;
-	
+
 	return $self->{'log'};
-	
+
 }
 
 =head2 get_sf_count
 
 Returns the total amount of lines found in the seedfile. Will return 0
 if the seedfile was not opened (because of an error or you didn't
-supply a seedfile to open.) Will also return 0 if you supplied an empty 
-seedfile. 
+supply a seedfile to open.) Will also return 0 if you supplied an empty
+seedfile.
 
 =cut
 
 sub get_sf_count {
-	
+
 	my $self = shift;
-		
+
 	return $self->{'sf_count'};
 }
 
@@ -454,15 +454,15 @@ scope.
 =cut
 
 sub close_seedfile {
-	
+
 	my $self = shift;
-	
+
 	if ($self->{'sfh'}) {
 		close $self->{'sfh'};
 	}
-	
+
 	$self->{'sfh'} = undef;
-	
+
 }
 
 =head2 mail_sender
@@ -577,7 +577,7 @@ sub _init {
 				}
 		}
 	);
-	
+
 	if (defined $p{'mail'} and not defined $p{'faillog'} ) {
 		croak "Device::Utils, mail paramater given but faillog parameter missing.";
 	}
@@ -605,19 +605,19 @@ emergency
 
 
 sub _setup_logging {
-	
+
 	my $self = shift;
-	
+
 	my $log = Log::Dispatch->new();
-	
+
 	# Syslog
 	#
 	if ($self->{'options'}->{'syslog'}) {
-		
+
 		# Go through each syslog server and add to the log dispatcher.
-		#		
+		#
 		foreach (keys %{$self->{'options'}->{'syslog'}}) {
-						
+
 			$log->add (Log::Dispatch::Log::Syslog::Fast->new(
 							min_level 	=> 'warning',
 							name		=> $_,
@@ -625,12 +625,13 @@ sub _setup_logging {
 							facility	=> $self->{'options'}->{'syslog'}->{$_}->{'facility'},
 							severity	=> $self->{'options'}->{'syslog'}->{$_}->{'severity'},
 							host		=> $self->{'options'}->{'syslog'}->{$_}->{'host'},
-							port		=> $self->{'options'}->{'syslog'}->{$_}->{'port'}
+							port		=> $self->{'options'}->{'syslog'}->{$_}->{'port'},
+							callbacks => $self->_cut_timestamp
 							)
 						);
 		}
 	}
-	
+
 	# File logging.
 	#
 	$log->add(
@@ -642,7 +643,7 @@ sub _setup_logging {
 			mode      => '>'
 		)
 	) if $self->{'options'}->{'debuglog'};
-	
+
 	$log->add(
 		Log::Dispatch::FileShared->new(
 			name      => 'infolog',
@@ -652,7 +653,7 @@ sub _setup_logging {
 			mode      => '>'
 		)
 	) if $self->{'options'}->{'infolog'};
-	
+
 	$log->add(
 		Log::Dispatch::FileShared->new(
 			name      => 'errorlog',
@@ -662,8 +663,8 @@ sub _setup_logging {
 			mode      => '>'
 		)
 	) if $self->{'options'}->{'errorlog'};
-	
-	
+
+
 	$log->add(
 		Log::Dispatch::FileShared->new(
 			name      => 'faillog',
@@ -673,7 +674,7 @@ sub _setup_logging {
 			mode      => '>'
 		)
 	) if $self->{'options'}->{'faillog'};
-	
+
 	$log->add(
 		Log::Dispatch::FileShared->new(
 			name      => 'combined_log',
@@ -682,8 +683,8 @@ sub _setup_logging {
 			mode      => '>'
 		)
 	) if $self->{'options'}->{'combined_log'};
-	
-	
+
+
 	# Screen / CLI
 	#
 	$log->add(
@@ -693,7 +694,7 @@ sub _setup_logging {
 			max_level => 'notice'
 		)
 	) unless $self->{'options'}->{'quiet'};
-	
+
 	$log->add(
 		Log::Dispatch::Screen->new(
 			name      => 'errors_warnings_stderr',
@@ -701,7 +702,7 @@ sub _setup_logging {
 			stderr    => 1
 		)
 	) unless $self->{'options'}->{'quiet'};
-	
+
 	return $log;
 }
 
@@ -709,31 +710,39 @@ sub _setup_logging {
 sub _valid_line {
 	my $self = shift;
 	my $line = shift;
-	
+
 	trim $line;
-	
+
 	return $line;
 }
 
+sub _cut_timestamp {
+	my $params = shift;
+
+	print Dumper ($params);
+
+	return $params->message;
+}
+
 sub _open_seedfile {
-	
+
 	my $self = shift;
-	
+
 	if ($self->{'options'}->{'seedfile'}) {
 		open SEEDFILE, $self->{'options'}->{'seedfile'} or die "ERROR: Can't open seedfile: $!";
 		return *SEEDFILE;
 	}
-	
+
 	return undef;
-	
+
 }
 
 sub DESTROY {
-	
+
 	my $self = shift;
-	
+
 	close_seedfile();
-	
+
 }
 
 =head1 AUTHOR
