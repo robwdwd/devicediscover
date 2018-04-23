@@ -625,7 +625,8 @@ sub _setup_logging {
               facility  => $self->{'options'}->{'syslog'}->{$_}->{'facility'},
               severity  => $self->{'options'}->{'syslog'}->{$_}->{'severity'},
               host    => $self->{'options'}->{'syslog'}->{$_}->{'host'},
-              port    => $self->{'options'}->{'syslog'}->{$_}->{'port'}
+              port    => $self->{'options'}->{'syslog'}->{$_}->{'port'},
+							callbacks => $self->_cut_timestamp
               )
             );
     }
@@ -705,6 +706,13 @@ sub _setup_logging {
   return $log;
 }
 
+sub _cut_timestamp {
+	my $params = shift;
+
+	print Dumper ($params);
+
+	return $params->message;
+}
 
 sub _valid_line {
   my $self = shift;
