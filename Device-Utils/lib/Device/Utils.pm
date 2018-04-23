@@ -6,7 +6,7 @@ use strict;
 use warnings FATAL => 'all';
 use Carp;
 
-use POSIX qw ( ceil ) ;
+use POSIX qw ( ceil );
 
 use Log::Dispatch;
 use Log::Dispatch::Screen;
@@ -28,7 +28,6 @@ Version 0.06
 =cut
 
 our $VERSION = '0.06';
-
 
 =head1 SYNOPSIS
 
@@ -181,15 +180,15 @@ Set to an integer value above 0 to get some debug output.
 =cut
 
 sub new {
-  my $class = shift;
+  my $class   = shift;
   my %options = @_;
 
   my $self = {
-    sfh => undef,
+    sfh      => undef,
     sf_count => 0,
     vlsubref => undef,
-    log => undef,
-    options => {}
+    log      => undef,
+    options  => {}
   };
 
   bless($self, $class);
@@ -207,13 +206,13 @@ sub new {
     my $fh = $self->_open_seedfile();
 
     # Get number of lines in file.
-    while(<$fh>) {};
+    while (<$fh>) { }
     $self->{'sf_count'} = $.;
-    seek $fh, 0, 0; # Rewind
+    seek $fh, 0, 0;    # Rewind
 
     $self->{'sfh'} = $fh;
 
-    $self->logger ('warning', 'WARNING', 'Seedfile contents are empty, this is probably not what you want.') if ($self->{'sf_count'} <= 0);
+    $self->logger('warning', 'WARNING', 'Seedfile contents are empty, this is probably not what you want.') if ($self->{'sf_count'} <= 0);
   }
 
   # Set valid line code ref here, Params::Validate should check it's
@@ -223,7 +222,7 @@ sub new {
     $self->{'vlsubref'} = $self->{'options'}->{'valid_line_sub'};
   }
 
-  return($self);
+  return ($self);
 }
 
 =head1 SUBROUTINES/METHODS
@@ -249,14 +248,14 @@ sub fork_counts {
 
   return 0 unless $total_lines;
 
-  $processes = 1 if $processes <= 0; # Can't have 0 or negative processes.
+  $processes = 1 if $processes <= 0;    # Can't have 0 or negative processes.
 
   # Check if the total lines is less than the maximum processes, if so divide
   # by three.
   #
   if ($total_lines < $processes) {
-    $processes = ceil  ($total_lines / 3) || 1; # Divide the total lines by 3, if 0 (less than 3 lines) set to 1.
-    $self->logger ('notice', 'NOTICE', "Changing process count to be a third of total lines ($total_lines) in seedfile, process count now $processes.");
+    $processes = ceil($total_lines / 3) || 1;    # Divide the total lines by 3, if 0 (less than 3 lines) set to 1.
+    $self->logger('notice', 'NOTICE', "Changing process count to be a third of total lines ($total_lines) in seedfile, process count now $processes.");
   }
 
   # Check if total lines in seedfile divided by number of processes is less
@@ -264,17 +263,19 @@ sub fork_counts {
   # number of lines divided by process.
 
   if ($total_lines / $processes < $queue_size) {
-    $queue_size = ceil ($total_lines / $processes);
+    $queue_size = ceil($total_lines / $processes);
 
     # If devices per process works out to be one, let's reduce the number
     # of processes further so that devices per process is at least 3.
     #
     if ($queue_size <= 1) {
-      $processes = ceil ($processes / 3);
+      $processes  = ceil($processes / 3);
       $queue_size = 3;
-      $self->logger ('notice', 'NOTICE', "Changing number of process to maintain a queue size of three, process count now $processes, queue size now 3. Total seed lines $total_lines.");
+      $self->logger('notice', 'NOTICE',
+        "Changing number of process to maintain a queue size of three, process count now $processes, queue size now 3. Total seed lines $total_lines.");
     } else {
-      $self->logger ('notice', 'NOTICE', "Setting queue size to $queue_size (with $processes process) for better performance. Total lines $total_lines / $processes = $queue_size.");
+      $self->logger('notice', 'NOTICE',
+        "Setting queue size to $queue_size (with $processes process) for better performance. Total lines $total_lines / $processes = $queue_size.");
     }
 
   }
@@ -305,22 +306,20 @@ head3
 
 sub readNlines {
 
-  my $self = shift;
+  my $self  = shift;
   my $count = shift;
 
-  my $fh = $self->{'sfh'};
+  my $fh     = $self->{'sfh'};
   my $subref = $self->{'vlsubref'};
 
   my $lines = [];
 
-
-
   unless ($fh) {
-    $self->logger ('error', 'ERROR', 'Seedfile not open, returning empty list.');
+    $self->logger('error', 'ERROR', 'Seedfile not open, returning empty list.');
     return 0;
   }
 
-  while(<$fh>) {
+  while (<$fh>) {
 
     trim $_;
 
@@ -333,8 +332,8 @@ sub readNlines {
     }
 
     if ($dev) {
-      $self->logger ('debug', 'DEBUG', "[$_] Finished parsing line, adding to queue.") if $self->{'options'}->{'debug'} >= 2;
-      push( @$lines, $dev );
+      $self->logger('debug', 'DEBUG', "[$_] Finished parsing line, adding to queue.") if $self->{'options'}->{'debug'} >= 2;
+      push(@$lines, $dev);
     }
 
     last if @$lines == $count;
@@ -381,7 +380,7 @@ sub logger {
     ($level, $tag, $device, $msg) = @_;
   }
 
-  return 0 unless ($msg); # Message is empty.
+  return 0 unless ($msg);    # Message is empty.
 
   $msg =~ s/\r|\n/ /g;
 
@@ -397,16 +396,16 @@ sub logger {
 
     my $pre = '';
 
-    $pre .= '[' . $device->{'hostname'} . '] '  if (defined $device->{'hostname'});
-    $pre .= '[' . $device->{'os'} . '] '     if (defined $device->{'os'});
-    $pre .= '[' . $device->{'protocol'} . '] '  if (defined $device->{'protocol'});
+    $pre .= '[' . $device->{'hostname'} . '] ' if (defined $device->{'hostname'});
+    $pre .= '[' . $device->{'os'} . '] '       if (defined $device->{'os'});
+    $pre .= '[' . $device->{'protocol'} . '] ' if (defined $device->{'protocol'});
 
-    $message = sprintf ("%s %-7s: %s%s\n", $dt, $tag, $pre, $msg);
+    $message = sprintf("%s %-7s: %s%s\n", $dt, $tag, $pre, $msg);
   } else {
-    $message = sprintf ("%s %-7s: %s\n", $dt, $tag, $msg);
+    $message = sprintf("%s %-7s: %s\n", $dt, $tag, $msg);
   }
 
-  $self->{'log'}->log( level => $level, message => $message);
+  $self->{'log'}->log(level => $level, message => $message);
 
   return 1;
 
@@ -476,31 +475,26 @@ sub mail_sender {
   my $self = shift;
 
   unless ($self->{'options'}->{'faillog'}) {
-    $self->logger ('error', 'ERROR', "Can't mail failed log, faillog is not enabled.");
+    $self->logger('error', 'ERROR', "Can't mail failed log, faillog is not enabled.");
     return;
   }
 
   use Email::Stuffer;
 
-  $self->logger ('debug', 'DEBUG', "Sending failed log file email.") if $self->{'options'}->{'debug'};
+  $self->logger('debug', 'DEBUG', "Sending failed log file email.") if $self->{'options'}->{'debug'};
 
   my $subject = $self->{'options'}->{'mail'}->{'subject'} || 'Device failure log.';
 
   eval {
 
-    Email::Stuffer->from($self->{'options'}->{'mail'}->{'from'})
-      ->to($self->{'options'}->{'mail'}->{'to'})
-      ->subject($subject)
-      ->text_body('Failure log is attached')
-      ->attach_file($self->{'options'}->{'faillog'})
-      ->send_or_die;
+    Email::Stuffer->from($self->{'options'}->{'mail'}->{'from'})->to($self->{'options'}->{'mail'}->{'to'})->subject($subject)
+      ->text_body('Failure log is attached')->attach_file($self->{'options'}->{'faillog'})->send_or_die;
 
   };
   if ($@) {
-    $self->logger ('error', 'ERROR', "Failed to send the failed log email: $@");
+    $self->logger('error', 'ERROR', "Failed to send the failed log email: $@");
   }
 }
-
 
 =head1 INTERNAL METHODS
 
@@ -517,68 +511,69 @@ sub _init {
   my $self = shift;
 
   my %p = validate(
-    @_, {
-        total_devices => {
-          type  => SCALAR,
-          optional => 1,
-          default => undef
-        },
-        seedfile => {
-          type  => SCALAR | UNDEF,
-          optional => 1,
-          default => undef
-        },
-        valid_line_sub => {
-          type  => CODEREF | UNDEF,
-          optional => 1
-        },
-        syslog => {
-          type  => HASHREF | UNDEF,
-          optional => 1,
-          default => undef
-        },
-        mail => {
-          type  => HASHREF | UNDEF,
-          optional => 1,
-          default => undef
-        },
-        combined_log => {
-          type  => UNDEF | SCALAR,
-          optional => 1,
-          default => undef
-        },
-        debuglog => {
-          type  => UNDEF | SCALAR,
-          optional => 1,
-          default => undef
-        },
-        infolog => {
-          type  => UNDEF | SCALAR,
-          optional => 1,
-          default => undef
-        },
-        errorlog => {
-          type  => UNDEF | SCALAR,
-          optional => 1,
-          default => undef
-        },
-        faillog => {
-          type  => UNDEF | SCALAR,
-          optional => 1,
-          default => undef
-        },
-        quiet => {
-          type  => SCALAR | UNDEF,
-          default => 0
-        },
-        debug => {
-          type  => SCALAR | UNDEF,
-          default => 0
-        }
+    @_,
+    {
+      total_devices => {
+        type     => SCALAR,
+        optional => 1,
+        default  => undef
+      },
+      seedfile => {
+        type     => SCALAR | UNDEF,
+        optional => 1,
+        default  => undef
+      },
+      valid_line_sub => {
+        type     => CODEREF | UNDEF,
+        optional => 1
+      },
+      syslog => {
+        type     => HASHREF | UNDEF,
+        optional => 1,
+        default  => undef
+      },
+      mail => {
+        type     => HASHREF | UNDEF,
+        optional => 1,
+        default  => undef
+      },
+      combined_log => {
+        type     => UNDEF | SCALAR,
+        optional => 1,
+        default  => undef
+      },
+      debuglog => {
+        type     => UNDEF | SCALAR,
+        optional => 1,
+        default  => undef
+      },
+      infolog => {
+        type     => UNDEF | SCALAR,
+        optional => 1,
+        default  => undef
+      },
+      errorlog => {
+        type     => UNDEF | SCALAR,
+        optional => 1,
+        default  => undef
+      },
+      faillog => {
+        type     => UNDEF | SCALAR,
+        optional => 1,
+        default  => undef
+      },
+      quiet => {
+        type    => SCALAR | UNDEF,
+        default => 0
+      },
+      debug => {
+        type    => SCALAR | UNDEF,
+        default => 0
+      }
     }
   );
 
-  if (defined $p{'mail'} and not defined $p{'faillog'} ) {
+  if (defined $p{'mail'} and not defined $p{'faillog'}) {
     croak "Device::Utils, mail paramater given but faillog parameter missing.";
   }
 
@@ -603,7 +598,6 @@ emergency
 
 =cut
 
-
 sub _setup_logging {
 
   my $self = shift;
@@ -616,18 +610,19 @@ sub _setup_logging {
 
     # Go through each syslog server and add to the log dispatcher.
     #
-    foreach (keys %{$self->{'options'}->{'syslog'}}) {
+    foreach (keys %{ $self->{'options'}->{'syslog'} }) {
 
-      $log->add (Log::Dispatch::Log::Syslog::Fast->new(
-              min_level   => 'debug',
-              name    => $_,
-              transport  => $self->{'options'}->{'syslog'}->{$_}->{'protocol'},
-              facility  => $self->{'options'}->{'syslog'}->{$_}->{'facility'},
-              severity  => $self->{'options'}->{'syslog'}->{$_}->{'severity'},
-              host    => $self->{'options'}->{'syslog'}->{$_}->{'host'},
-              port    => $self->{'options'}->{'syslog'}->{$_}->{'port'}
-              )
-            );
+      $log->add(
+        Log::Dispatch::Log::Syslog::Fast->new(
+          min_level => 'debug',
+          name      => $_,
+          transport => $self->{'options'}->{'syslog'}->{$_}->{'protocol'},
+          facility  => $self->{'options'}->{'syslog'}->{$_}->{'facility'},
+          severity  => $self->{'options'}->{'syslog'}->{$_}->{'severity'},
+          host      => $self->{'options'}->{'syslog'}->{$_}->{'host'},
+          port      => $self->{'options'}->{'syslog'}->{$_}->{'port'}
+        )
+      );
     }
   }
 
@@ -663,7 +658,6 @@ sub _setup_logging {
     )
   ) if $self->{'options'}->{'errorlog'};
 
-
   $log->add(
     Log::Dispatch::FileShared->new(
       name      => 'faillog',
@@ -682,7 +676,6 @@ sub _setup_logging {
       mode      => '>'
     )
   ) if $self->{'options'}->{'combined_log'};
-
 
   # Screen / CLI
   #
@@ -824,4 +817,4 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =cut
 
-1; # End of Device::Utils
+1;    # End of Device::Utils

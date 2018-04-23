@@ -27,7 +27,6 @@ Version 0.03
 
 our $VERSION = '0.04';
 
-
 =head1 SYNOPSIS
 
 Device discovery module. Get's device managment protocol, either ssh or telnet
@@ -106,27 +105,26 @@ to Log::Dispatch, this has to be set up first.
 =cut
 
 sub new {
-	my $class = shift;
-	my %options = @_;
+  my $class   = shift;
+  my %options = @_;
 
-	my $self = {
-		has_err => 0,
-		errormsg => undef,
-		logobj	=> undef,
-		result => {},
-		options => {}
-	};
-	bless($self, $class);
+  my $self = {
+    has_err  => 0,
+    errormsg => undef,
+    logobj   => undef,
+    result   => {},
+    options  => {}
+  };
+  bless($self, $class);
 
-	$self->{'options'} = $self->_init(%options);
+  $self->{'options'} = $self->_init(%options);
 
-	if ((defined $self->{'options'}->{'logobj'} ) and (blessed ($self->{'options'}->{'logobj'}) eq "Log::Dispatch")) {
-		$self->{'logobj'} = $self->{'options'}->{'logobj'};
-	}
+  if ((defined $self->{'options'}->{'logobj'}) and (blessed($self->{'options'}->{'logobj'}) eq "Log::Dispatch")) {
+    $self->{'logobj'} = $self->{'options'}->{'logobj'};
+  }
 
-	return($self);
+  return ($self);
 }
-
 
 =head2 get_management_protocol
 
@@ -138,17 +136,17 @@ the connection once connected.
 
 sub get_management_protocol {
 
-	my $self = shift;
+  my $self = shift;
 
-	return 'SSH' if $self->_check_ssh;
-	return 'TELNET' if $self->_check_telnet;
+  return 'SSH'    if $self->_check_ssh;
+  return 'TELNET' if $self->_check_telnet;
 
-	# Set error message and include the current error from the underlying
-	# managment protocol check.
+  # Set error message and include the current error from the underlying
+  # managment protocol check.
 
-	$self->_set_errormsg ('[Failed to discover CLI managment protocol.] [' . $self->{'errormsg'} . ']');
+  $self->_set_errormsg('[Failed to discover CLI managment protocol.] [' . $self->{'errormsg'} . ']');
 
-	return 0;
+  return 0;
 }
 
 =head2 parse_sysdesc
@@ -159,29 +157,29 @@ Parse SNMP sysDesc string from SNMP and get the OS running on the device.
 
 sub parse_sysdesc {
 
-	my $self = shift;
+  my $self = shift;
 
-	my $descr = $self->{'result'}->{'sysdesc'};
+  my $descr = $self->{'result'}->{'sysdesc'};
 
-	return 'JunOSe'		if ( $descr =~ m/ERX/);
-	return 'OneOS'		if ( $descr =~ m/ONEOS/);
-	return 'JunOS'		if ( $descr =~ m/Juniper/);
-	return 'EOS'		if ( $descr =~ m/Arista Networks/);
-	return 'TiMOS'		if ( $descr =~ m/TiMOS/);
-	return 'VRP'		if ( $descr =~ m/Huawei/);
-	return 'ArbOS'		if ( $descr =~ m/Peakflow/i);
-	return 'IOS-XE'		if ( $descr =~ m/IOS-XE/ );
-	return 'IOS-XR'		if ( $descr =~ m/IOS XR/ );
-	return 'IOS'		if ( $descr =~ m/IOS/ );
-	return 'CatOS'		if ( $descr =~ m/catalyst/i );
-	return 'css'		if ( $descr =~ m/Content Switch SW/ );
-	return 'css-sca'	if ( $descr =~ m/Cisco Systems Inc CSS-SCA-/ );
-	return 'pix'		if ( $descr =~ m/Cisco PIX Security Appliance/ );
-	return 'asa'		if ( $descr =~ m/Cisco Adaptive Security Appliance/ );
-	return 'san-os'		if ( $descr =~ m/Cisco SAN-OS/ );
+  return 'JunOSe'  if ($descr =~ m/ERX/);
+  return 'OneOS'   if ($descr =~ m/ONEOS/);
+  return 'JunOS'   if ($descr =~ m/Juniper/);
+  return 'EOS'     if ($descr =~ m/Arista Networks/);
+  return 'TiMOS'   if ($descr =~ m/TiMOS/);
+  return 'VRP'     if ($descr =~ m/Huawei/);
+  return 'ArbOS'   if ($descr =~ m/Peakflow/i);
+  return 'IOS-XE'  if ($descr =~ m/IOS-XE/);
+  return 'IOS-XR'  if ($descr =~ m/IOS XR/);
+  return 'IOS'     if ($descr =~ m/IOS/);
+  return 'CatOS'   if ($descr =~ m/catalyst/i);
+  return 'css'     if ($descr =~ m/Content Switch SW/);
+  return 'css-sca' if ($descr =~ m/Cisco Systems Inc CSS-SCA-/);
+  return 'pix'     if ($descr =~ m/Cisco PIX Security Appliance/);
+  return 'asa'     if ($descr =~ m/Cisco Adaptive Security Appliance/);
+  return 'san-os'  if ($descr =~ m/Cisco SAN-OS/);
 
-	$self->_set_errormsg ('Unable to discover os running on device. sysDesc or lldpDesc not parseable: ' . $self->{'result'}->{'sysdesc'} );
-	return 0;
+  $self->_set_errormsg('Unable to discover os running on device. sysDesc or lldpDesc not parseable: ' . $self->{'result'}->{'sysdesc'});
+  return 0;
 }
 
 =head2 get_sysdesc
@@ -192,98 +190,104 @@ Connects to device with snmp and gets sysDesc and lldpDesc.
 
 sub get_sysdesc {
 
-	use Net::SNMP;
+  use Net::SNMP;
 
-	my $self = shift;
+  my $self = shift;
 
-	my $sysDesc	  = '1.3.6.1.2.1.1.1.0';
-	my $lldpDesc  = '1.0.8802.1.1.2.1.3.4.0';
-	my $session;
-	my $error;
+  my $sysDesc  = '1.3.6.1.2.1.1.1.0';
+  my $lldpDesc = '1.0.8802.1.1.2.1.3.4.0';
+  my $session;
+  my $error;
 
-	my $community = $self->{'options'}->{'community'};
+  my $community = $self->{'options'}->{'community'};
 
-	$community = $self->{'result'}->{'community'} if ($self->{'options'}->{'find_community'});
+  $community = $self->{'result'}->{'community'} if ($self->{'options'}->{'find_community'});
 
-	# First try SNMP v2c
+  # First try SNMP v2c
 
-	$self->_logger ('debug', 'DEBUG', "[SNMP] Trying SNMP v2c") if $self->{'options'}->{'debug'};
+  $self->_logger('debug', 'DEBUG', "[SNMP] Trying SNMP v2c") if $self->{'options'}->{'debug'};
 
-	($session, $error) = Net::SNMP->session(	Hostname => $self->{'options'}->{'hostname'},
-												Version => 2,
-												Community => $community,
-												Timeout => $self->{'options'}->{'snmptimeout'});
+  ($session, $error) = Net::SNMP->session(
+    Hostname  => $self->{'options'}->{'hostname'},
+    Version   => 2,
+    Community => $community,
+    Timeout   => $self->{'options'}->{'snmptimeout'}
+  );
 
+  if (defined $session) {
+    my $result = $session->get_request(Varbindlist => [ $sysDesc, $lldpDesc ]);
 
+    if (defined($result)) {
+      $session->close;
 
-	if (defined $session) {
-		my $result = $session->get_request( Varbindlist => [$sysDesc, $lldpDesc]);
+      my $line = $result->{$sysDesc} . " " . $result->{$lldpDesc};
 
-		if (defined($result)) {
-			$session->close;
+      $self->{'result'}->{'sysdesc'} = $line;
+      $line =~ s/\r|\n/ /g;
+      $self->_logger('debug', 'DEBUG', "[SNMP] [v2c] [$line]") if $self->{'options'}->{'debug'} >= 2;
 
-			my $line = $result->{$sysDesc} . " " . $result->{$lldpDesc};
+      return 1;
+    } else {
+      $self->_logger('debug', 'DEBUG', '[SNMP] [v2c] ' . $session->error) if $self->{'options'}->{'debug'};
+    }
+    $session->close;
+  } else {
+    $self->_logger('debug', 'DEBUG', '[SNMP] [v2c] ' . $error) if $self->{'options'}->{'debug'};
+  }
 
-			$self->{'result'}->{'sysdesc'} = $line;
-			$line =~ s/\r|\n/ /g;
-			$self->_logger ('debug', 'DEBUG', "[SNMP] [v2c] [$line]") if $self->{'options'}->{'debug'} >= 2;
+  if (defined($self->{'options'}->{'snmpusername'}) and defined($self->{'options'}->{'snmppassword'})) {
 
-			return 1;
-		} else {
-			$self->_logger ('debug', 'DEBUG', '[SNMP] [v2c] ' . $session->error) if $self->{'options'}->{'debug'};
-		}
-		$session->close;
-	} else {
-		$self->_logger ('debug', 'DEBUG', '[SNMP] [v2c] ' . $error) if $self->{'options'}->{'debug'};
-	}
+    # Now try SNMPv3
 
+    $self->_logger('debug', 'DEBUG', "[SNMP] Trying SNMP v3") if $self->{'options'}->{'debug'};
 
-	if (defined ($self->{'options'}->{'snmpusername'}) and defined ($self->{'options'}->{'snmppassword'})) {
+    $self->_logger('debug', 'DEBUG',
+          '[SNMP] [v3] User: '
+        . $self->{'options'}->{'snmpusername'}
+        . ', PW: '
+        . $self->{'options'}->{'snmppassword'}
+        . ', Priv: '
+        . $self->{'options'}->{'snmppriv'})
+      if $self->{'options'}->{'debug'} >= 2;
 
-		# Now try SNMPv3
+    ($session, $error) = Net::SNMP->session(
+      Hostname     => $self->{'options'}->{'hostname'},
+      Version      => 3,
+      Username     => $self->{'options'}->{'snmpusername'},
+      Authpassword => $self->{'options'}->{'snmppassword'},
+      Privpassword => $self->{'options'}->{'snmppriv'},
+      Privprotocol => $self->{'options'}->{'snmpprivproto'},
+      Authprotocol => $self->{'options'}->{'snmpauthproto'},
+      Timeout      => $self->{'options'}->{'snmptimeout'}
+    );
 
-		$self->_logger ('debug', 'DEBUG', "[SNMP] Trying SNMP v3") if $self->{'options'}->{'debug'};
+    if (defined $session) {
+      my $result = $session->get_request(Varbindlist => [ $sysDesc, $lldpDesc ]);
 
-		$self->_logger ('debug', 'DEBUG', '[SNMP] [v3] User: ' . $self->{'options'}->{'snmpusername'} . ', PW: ' .  $self->{'options'}->{'snmppassword'} . ', Priv: ' .  $self->{'options'}->{'snmppriv'}) if $self->{'options'}->{'debug'} >= 2;
+      if (defined($result)) {
+        $session->close;
 
-		($session, $error) = Net::SNMP->session(	Hostname => $self->{'options'}->{'hostname'},
-													Version => 3,
-													Username => $self->{'options'}->{'snmpusername'},
-													Authpassword => $self->{'options'}->{'snmppassword'},
-													Privpassword => $self->{'options'}->{'snmppriv'},
-													Privprotocol  => $self->{'options'}->{'snmpprivproto'},
-													Authprotocol  => $self->{'options'}->{'snmpauthproto'},
-													Timeout => $self->{'options'}->{'snmptimeout'});
+        my $line = $result->{$sysDesc} . " " . $result->{$lldpDesc};
 
+        $self->{'result'}->{'sysdesc'} = $line;
+        $line =~ s/\r|\n/ /g;
+        $self->_logger('debug', 'DEBUG', "[SNMP] [v3] [$line]") if $self->{'options'}->{'debug'} >= 2;
 
-		if (defined $session) {
-			my $result = $session->get_request( Varbindlist => [$sysDesc, $lldpDesc]);
+        return 1;
+      } else {
+        $self->_logger('debug', 'DEBUG', '[SNMP] [v3] ' . $session->error) if $self->{'options'}->{'debug'};
+      }
+      $session->close;
+    } else {
+      $self->_logger('debug', 'DEBUG', '[SNMP] [v3] ' . $error) if $self->{'options'}->{'debug'};
+    }
 
-			if (defined($result)) {
-				$session->close;
+  }
 
-				my $line = $result->{$sysDesc} . " " . $result->{$lldpDesc};
+  $self->_set_errormsg('[SNMP] Unable to connect to device with SNMP.');
 
-				$self->{'result'}->{'sysdesc'} = $line;
-				$line =~ s/\r|\n/ /g;
-				$self->_logger ('debug', 'DEBUG', "[SNMP] [v3] [$line]") if $self->{'options'}->{'debug'} >= 2;
-
-				return 1;
-			} else {
-				$self->_logger ('debug', 'DEBUG', '[SNMP] [v3] ' . $session->error) if $self->{'options'}->{'debug'};
-			}
-			$session->close;
-		} else {
-			$self->_logger ('debug', 'DEBUG', '[SNMP] [v3] ' . $error) if $self->{'options'}->{'debug'};
-		}
-
-	}
-
-	$self->_set_errormsg ('[SNMP] Unable to connect to device with SNMP.');
-
-	return 0;
+  return 0;
 }
-
 
 =head2 get_community
 
@@ -293,46 +297,47 @@ Find the community used on this device from community list.
 
 sub get_community {
 
-	use Net::SNMP;
+  use Net::SNMP;
 
-	my $self = shift;
+  my $self = shift;
 
-	my $sysDesc   = '1.3.6.1.2.1.1.1.0';
+  my $sysDesc = '1.3.6.1.2.1.1.1.0';
 
-	my @community_list = split (',', $self->{'options'}->{'community_list'});
+  my @community_list = split(',', $self->{'options'}->{'community_list'});
 
-	foreach my $community (@community_list) {
+  foreach my $community (@community_list) {
 
-		my ($session, $error) = Net::SNMP->session(Hostname	=> $self->{'options'}->{'hostname'},
-													Version		=> 2,
-													Community	=> $community,
-													Timeout		=> $self->{'options'}->{'snmptimeout'},
-													Retries		=> 1
-													);
+    my ($session, $error) = Net::SNMP->session(
+      Hostname  => $self->{'options'}->{'hostname'},
+      Version   => 2,
+      Community => $community,
+      Timeout   => $self->{'options'}->{'snmptimeout'},
+      Retries   => 1
+    );
 
-		if (!defined($session)) {
-			$self->_set_errormsg ('[Community Discover] ' . $error);
-			return 0;
-		}
+    if (!defined($session)) {
+      $self->_set_errormsg('[Community Discover] ' . $error);
+      return 0;
+    }
 
-		my $result = $session->get_request( Varbindlist => [$sysDesc] );
+    my $result = $session->get_request(Varbindlist => [$sysDesc]);
 
-		# If there is an snmp response this community works
-		# no need to find any others so move on to the next device.
-		#
-		if (defined($result)) {
-			$session->close;
+    # If there is an snmp response this community works
+    # no need to find any others so move on to the next device.
+    #
+    if (defined($result)) {
+      $session->close;
 
-			$self->_logger ('debug', 'DEBUG', "[Community Discover] Found community in use on this device: $community") if $self->{'options'}->{'debug'};
+      $self->_logger('debug', 'DEBUG', "[Community Discover] Found community in use on this device: $community") if $self->{'options'}->{'debug'};
 
-			$self->{'result'}->{'community'} = $community;
-			return 1;
-		}
-	}
+      $self->{'result'}->{'community'} = $community;
+      return 1;
+    }
+  }
 
-	$self->_set_errormsg ("[Community Discover] Can't find a usable snmp community.");
+  $self->_set_errormsg("[Community Discover] Can't find a usable snmp community.");
 
-	return 0;
+  return 0;
 }
 
 =head2 discover
@@ -347,54 +352,54 @@ os, SNMP sysDesc and managment protocol.
 
 sub discover {
 
-	my $self = shift;
+  my $self = shift;
 
-	my $hostname = $self->{'result'}->{'hostname'};
+  my $hostname = $self->{'result'}->{'hostname'};
 
-	my $ip_addr = inet_aton $self->{'result'}->{'hostname'} or do {
-		$self->{'has_error'} = 1;
-		$self->_set_errormsg ('Unknown hostname or IP address: ' . $self->{'result'}->{'hostname'});
-		return 0;
-	};
+  my $ip_addr = inet_aton $self->{'result'}->{'hostname'} or do {
+    $self->{'has_error'} = 1;
+    $self->_set_errormsg('Unknown hostname or IP address: ' . $self->{'result'}->{'hostname'});
+    return 0;
+  };
 
-	if ($self->{'options'}->{'find_community'}) {
-		unless ($self->get_community()) {
-			$self->{'has_error'} = 1;
-			return 0;
-		};
-	}
+  if ($self->{'options'}->{'find_community'}) {
+    unless ($self->get_community()) {
+      $self->{'has_error'} = 1;
+      return 0;
+    }
+  }
 
-	unless (defined $self->{'options'}->{'os'}) {
+  unless (defined $self->{'options'}->{'os'}) {
 
-		unless ($self->get_sysdesc()) {
-			$self->{'has_error'} = 1;
-			return 0;
-		};
+    unless ($self->get_sysdesc()) {
+      $self->{'has_error'} = 1;
+      return 0;
+    }
 
-		if (my $os = $self->parse_sysdesc()) {
-			$self->_logger ('debug', 'DEBUG', "Discovered device is running $os as it's operating system.") if $self->{'options'}->{'debug'};
-			$self->{'result'}->{'os'} = $os;
-		} else {
-			$self->{'has_error'} = 1;
-			return 0;
-		}
-	} else {
-		$self->{'result'}->{'os'} = $self->{'options'}->{'os'};
-	}
+    if (my $os = $self->parse_sysdesc()) {
+      $self->_logger('debug', 'DEBUG', "Discovered device is running $os as it's operating system.") if $self->{'options'}->{'debug'};
+      $self->{'result'}->{'os'} = $os;
+    } else {
+      $self->{'has_error'} = 1;
+      return 0;
+    }
+  } else {
+    $self->{'result'}->{'os'} = $self->{'options'}->{'os'};
+  }
 
-	unless (defined $self->{'options'}->{'protocol'}) {
+  unless (defined $self->{'options'}->{'protocol'}) {
 
-		if (my $protocol = $self->get_management_protocol()) {
-			$self->{'result'}->{'protocol'} = $protocol;
-		} else {
-			$self->{'has_error'} = 1;
-			return 0;
-		}
-	} else {
-		$self->{'result'}->{'protocol'} = $self->{'options'}->{'protocol'};
-	}
+    if (my $protocol = $self->get_management_protocol()) {
+      $self->{'result'}->{'protocol'} = $protocol;
+    } else {
+      $self->{'has_error'} = 1;
+      return 0;
+    }
+  } else {
+    $self->{'result'}->{'protocol'} = $self->{'options'}->{'protocol'};
+  }
 
-	return $self->{'result'};
+  return $self->{'result'};
 }
 
 =head2 has_error
@@ -404,9 +409,9 @@ Returns if the object has an error.
 =cut
 
 sub has_error {
-	my $self = shift;
+  my $self = shift;
 
-	return $self->{'has_error'};
+  return $self->{'has_error'};
 }
 
 =head2 errormsg
@@ -419,8 +424,8 @@ messages can be stored here.)
 =cut
 
 sub errormsg {
-	my $self = shift;
-	return $self->{'errormsg'};
+  my $self = shift;
+  return $self->{'errormsg'};
 }
 
 =head1 INTERNAL METHODS
@@ -435,91 +440,92 @@ init function to validate arguments, not called directly.
 =cut
 
 sub _init {
-	my $self = shift;
+  my $self = shift;
 
-	my %p = validate(
-		@_, {
-				hostname => {
-					type	=> SCALAR
-				},
-				os => {
-					type	=> SCALAR,
-					optional => 1,
-					default => undef,
-				},
-				protocol => {
-					type	=> SCALAR,
-					optional => 1,
-				},
-				ssh_os_ignore => {
-					type => SCALAR | UNDEF,
-					optional => 1
-				},
-				snmpversion => {
-					type	=> SCALAR | UNDEF,
-					optional => 1,
-				},
-				community => {
-					type	=> SCALAR,
-					optional => 1,
-				},
-				snmpusername => {
-					type	=> SCALAR | UNDEF,
-					optional => 1,
-					depends	 => ['snmppassword','snmppriv']
-				},
-				snmppassword => {
-					type	=> SCALAR | UNDEF,
-					optional => 1,
-					depends	 => ['snmpusername', 'snmppriv', 'snmpauthproto'],
-				},
-				snmppriv => {
-					type	=> SCALAR | UNDEF,
-					optional => 1,
-					depends	 => ['snmppassword', 'snmpusername', 'snmpprivproto'],
-				},
-				snmpauthproto => {
-					type	=> SCALAR | UNDEF,
-					optional => 1,
-					depends	 => ['snmppassword', 'snmpusername', 'snmppriv', 'snmpprivproto'],
-				},
-				snmpprivproto => {
-					type	=> SCALAR | UNDEF,
-					optional => 1,
-					depends	 => ['snmppassword', 'snmpusername', 'snmppriv', 'snmpauthproto'],
-				},
-				snmptimeout => {
-					type	=> SCALAR,
-					default => 1
-				},
-				debug => {
-					type	=> SCALAR | UNDEF,
-					default => 0
-				},
-				community_list => {
-					type => SCALAR | UNDEF,
-					optional => 1
-				},
-				find_community => {
-					type	=> SCALAR | UNDEF,
-					default => 0
-				},
-				logobj => {
-					type	=> OBJECT | UNDEF,
-					default => undef,
-					optional => 1
-				},
+  my %p = validate(
+    @_,
+    {
+      hostname => {
+        type => SCALAR
+      },
+      os => {
+        type     => SCALAR,
+        optional => 1,
+        default  => undef,
+      },
+      protocol => {
+        type     => SCALAR,
+        optional => 1,
+      },
+      ssh_os_ignore => {
+        type     => SCALAR | UNDEF,
+        optional => 1
+      },
+      snmpversion => {
+        type     => SCALAR | UNDEF,
+        optional => 1,
+      },
+      community => {
+        type     => SCALAR,
+        optional => 1,
+      },
+      snmpusername => {
+        type     => SCALAR | UNDEF,
+        optional => 1,
+        depends  => [ 'snmppassword', 'snmppriv' ]
+      },
+      snmppassword => {
+        type     => SCALAR | UNDEF,
+        optional => 1,
+        depends  => [ 'snmpusername', 'snmppriv', 'snmpauthproto' ],
+      },
+      snmppriv => {
+        type     => SCALAR | UNDEF,
+        optional => 1,
+        depends  => [ 'snmppassword', 'snmpusername', 'snmpprivproto' ],
+      },
+      snmpauthproto => {
+        type     => SCALAR | UNDEF,
+        optional => 1,
+        depends  => [ 'snmppassword', 'snmpusername', 'snmppriv', 'snmpprivproto' ],
+      },
+      snmpprivproto => {
+        type     => SCALAR | UNDEF,
+        optional => 1,
+        depends  => [ 'snmppassword', 'snmpusername', 'snmppriv', 'snmpauthproto' ],
+      },
+      snmptimeout => {
+        type    => SCALAR,
+        default => 1
+      },
+      debug => {
+        type    => SCALAR | UNDEF,
+        default => 0
+      },
+      community_list => {
+        type     => SCALAR | UNDEF,
+        optional => 1
+      },
+      find_community => {
+        type    => SCALAR | UNDEF,
+        default => 0
+      },
+      logobj => {
+        type     => OBJECT | UNDEF,
+        default  => undef,
+        optional => 1
+      },
 
-		}
-	);
+    }
+  );
 
-	if (defined $p{'os'} and defined $p{'protocol'}) {
-		croak "Device::Discover, passing the os and protocol arguments just adds overhead to your script, there's nothing to discover if you know these already.";
-	}
+  if (defined $p{'os'} and defined $p{'protocol'}) {
+    croak "Device::Discover, passing the os and protocol arguments just adds overhead to your script, there's nothing to discover if you know these already.";
+  }
 
-	$self->{'result'}->{'hostname'} = $p{hostname};
+  $self->{'result'}->{'hostname'} = $p{hostname};
 
-	return \%p;
+  return \%p;
 }
 
 =head2 _logger
@@ -534,31 +540,29 @@ error message that will be logged.
 
 sub _logger {
 
-	my $self = shift;
+  my $self = shift;
 
-	my ($level, $tag, $msg) = @_;
+  my ($level, $tag, $msg) = @_;
 
-	$msg =~ s/\r|\n/ /g;
+  $msg =~ s/\r|\n/ /g;
 
-	my $time = gmtime;
-	my $dt = '[' . $time->datetime . '+00:00]';
+  my $time = gmtime;
+  my $dt   = '[' . $time->datetime . '+00:00]';
 
-	my $pre = '[' . $self->{'result'}->{'hostname'} . ']';
+  my $pre = '[' . $self->{'result'}->{'hostname'} . ']';
 
-	$pre .= ' [' . $self->{'result'}->{'os'} . ']' if (defined $self->{'result'}->{'os'});
+  $pre .= ' [' . $self->{'result'}->{'os'} . ']' if (defined $self->{'result'}->{'os'});
 
-	my $message = sprintf ("%s %-7s: [Device::Discover] %s %s\n", $dt, $tag, $pre, $msg);
+  my $message = sprintf("%s %-7s: [Device::Discover] %s %s\n", $dt, $tag, $pre, $msg);
 
+  if (defined $self->{'logobj'}) {
+    $self->{'logobj'}->log(level => $level, message => $message);
+  } else {
+    printf $message;
+  }
 
-	if (defined $self->{'logobj'}) {
-		$self->{'logobj'}->log( level => $level, message => $message);
-	} else {
-		printf $message;
-	}
-
-	return 1;
+  return 1;
 }
-
 
 =head2 _set_errormsg
 
@@ -571,12 +575,12 @@ connection but will pass with telnet.
 
 sub _set_errormsg {
 
-	my $self = shift;
-	my $errormsg = shift;
+  my $self     = shift;
+  my $errormsg = shift;
 
-	$self->{'errormsg'} = $errormsg;
+  $self->{'errormsg'} = $errormsg;
 
-	return 1;
+  return 1;
 }
 
 =head2 _check_ssh
@@ -590,121 +594,127 @@ if ssh should be ignored for this device.
 =cut
 
 sub _check_ssh {
-	my $self = shift;
+  my $self = shift;
 
-	# Check if SSH should be ignored.
-	#
-	if (defined $self->{'result'}->{'os'} and defined $self->{'options'}->{'ssh_os_ignore'} and any {$self->{'result'}->{'os'} eq $_} (split ',', $self->{'options'}->{'ssh_os_ignore'})) {
-		$self->_logger ('debug', 'DEBUG', '[SSH Check] Ignoring SSH for this device.') if $self->{'options'}->{'debug'};
-		return 0;
-	}
+  # Check if SSH should be ignored.
+  #
+  if (  defined $self->{'result'}->{'os'}
+    and defined $self->{'options'}->{'ssh_os_ignore'}
+    and any { $self->{'result'}->{'os'} eq $_ } (split ',', $self->{'options'}->{'ssh_os_ignore'}))
+  {
+    $self->_logger('debug', 'DEBUG', '[SSH Check] Ignoring SSH for this device.') if $self->{'options'}->{'debug'};
+    return 0;
+  }
 
-	my $sock = IO::Socket::INET->new(	PeerAddr	=> $self->{'result'}->{'hostname'},
-										PeerPort	=> 22,
-										Proto		=> 'tcp',
-										Timeout		=> 4);
+  my $sock = IO::Socket::INET->new(
+    PeerAddr => $self->{'result'}->{'hostname'},
+    PeerPort => 22,
+    Proto    => 'tcp',
+    Timeout  => 4
+  );
 
-	unless ($sock) {
-		$self->_logger ('debug', 'DEBUG', "[SSH Check] $!") if $self->{'options'}->{'debug'};
-		$self->_set_errormsg ("[SSH Check] $!");
-		return 0;
-	}
+  unless ($sock) {
+    $self->_logger('debug', 'DEBUG', "[SSH Check] $!") if $self->{'options'}->{'debug'};
+    $self->_set_errormsg("[SSH Check] $!");
+    return 0;
+  }
 
-	$self->_logger ('debug', 'DEBUG', '[SSH Check] Checking if ssh is available.') if $self->{'options'}->{'debug'};
+  $self->_logger('debug', 'DEBUG', '[SSH Check] Checking if ssh is available.') if $self->{'options'}->{'debug'};
 
-	my $line;
+  my $line;
 
-	do {
+  do {
 
-		my $buf = "";
-		$line = "";
+    my $buf = "";
+    $line = "";
 
-		do  {
+    do {
 
-			my $s = IO::Select->new($sock);
-			my @ready = $s->can_read(20);
+      my $s     = IO::Select->new($sock);
+      my @ready = $s->can_read(20);
 
-			if (!@ready) {
-				$self->_logger ('debug', 'DEBUG', "[SSH Check] Failed can_read, seems we can't read anything from the SSH port") if $self->{'options'}->{'debug'};
-				$self->_set_errormsg ("[SSH Check] Failed can_read, seems we can't read anything from the SSH port");
-				$sock->close;
-				return 0;
-			}
+      if (!@ready) {
+        $self->_logger('debug', 'DEBUG', "[SSH Check] Failed can_read, seems we can't read anything from the SSH port") if $self->{'options'}->{'debug'};
+        $self->_set_errormsg("[SSH Check] Failed can_read, seems we can't read anything from the SSH port");
+        $sock->close;
+        return 0;
+      }
 
-			my $bytes_read = sysread($sock, $buf, 1);
+      my $bytes_read = sysread($sock, $buf, 1);
 
-			if (not defined $bytes_read) {
-				next if $! == EAGAIN || $! == EWOULDBLOCK;
-				$self->_logger ('debug', 'DEBUG', "[SSH Check] Socket Error: $!.") if $self->{'options'}->{'debug'};
-				$self->_set_errormsg ("[SSH Check] Socket Error:" . $!);
-				$sock->close;
-				return 0;
-			} elsif ($bytes_read == 0) {
-				$self->_logger ('debug', 'DEBUG', '[SSH Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
-				$self->_set_errormsg ("[SSH Check] Remote host closed connection");
-				$sock->close;
-				return 0;
-			}
+      if (not defined $bytes_read) {
+        next if $! == EAGAIN || $! == EWOULDBLOCK;
+        $self->_logger('debug', 'DEBUG', "[SSH Check] Socket Error: $!.") if $self->{'options'}->{'debug'};
+        $self->_set_errormsg("[SSH Check] Socket Error:" . $!);
+        $sock->close;
+        return 0;
+      } elsif ($bytes_read == 0) {
+        $self->_logger('debug', 'DEBUG', '[SSH Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
+        $self->_set_errormsg("[SSH Check] Remote host closed connection");
+        $sock->close;
+        return 0;
+      }
 
-			$line .= $buf;
+      $line .= $buf;
 
-			if (substr($line, 0, 4) eq "SSH-" and length($line) > 255) {
-				$self->_logger ('debug', 'DEBUG', '[SSH Check] SSH Version line too long.') if $self->{'options'}->{'debug'};
-				$self->_set_errormsg ("[SSH Check] SSH Version line too long");
-				$sock->close;
-				return 0;
-			}
+      if (substr($line, 0, 4) eq "SSH-" and length($line) > 255) {
+        $self->_logger('debug', 'DEBUG', '[SSH Check] SSH Version line too long.') if $self->{'options'}->{'debug'};
+        $self->_set_errormsg("[SSH Check] SSH Version line too long");
+        $sock->close;
+        return 0;
+      }
 
-			if (length($line) > 4*1024) {
-				$self->_logger ('debug', 'DEBUG', '[SSH Check] SSH pre-version line too long.') if $self->{'options'}->{'debug'};
-				$self->_set_errormsg ("[SSH Check] SSH Pre-version line too long");
-				$sock->close;
-				return 0;
-			}
+      if (length($line) > 4 * 1024) {
+        $self->_logger('debug', 'DEBUG', '[SSH Check] SSH pre-version line too long.') if $self->{'options'}->{'debug'};
+        $self->_set_errormsg("[SSH Check] SSH Pre-version line too long");
+        $sock->close;
+        return 0;
+      }
 
-		} while ($buf ne "\n");
+    } while ($buf ne "\n");
 
-	} while (substr($line, 0, 4) ne "SSH-");
+  } while (substr($line, 0, 4) ne "SSH-");
 
-	$line =~ s/\cM?\n$//;
+  $line =~ s/\cM?\n$//;
 
-    $self->_logger ('debug', 'DEBUG', "[SSH Check] Found SSH remote version string: $line") if $self->{'options'}->{'debug'};
+  $self->_logger('debug', 'DEBUG', "[SSH Check] Found SSH remote version string: $line") if $self->{'options'}->{'debug'};
 
-    my ($remote_major, $remote_minor, $remote_version) = $line =~ /^SSH-(\d+)\.(\d+)-([^\n]+)$/;
+  my ($remote_major, $remote_minor, $remote_version) = $line =~ /^SSH-(\d+)\.(\d+)-([^\n]+)$/;
 
-	$self->_logger ('debug', 'DEBUG', "[SSH Check] Remote protocol version $remote_major.$remote_minor, remote software version $remote_version.") if $self->{'options'}->{'debug'};
+  $self->_logger('debug', 'DEBUG', "[SSH Check] Remote protocol version $remote_major.$remote_minor, remote software version $remote_version.")
+    if $self->{'options'}->{'debug'};
 
-    # Write version string back.
-    syswrite $sock, $line . "\n";
+  # Write version string back.
+  syswrite $sock, $line . "\n";
 
-	# Read more, should be encryption capabilities...
-    my $buf;
-    my $bytes_read = sysread($sock, $buf, 8192);
+  # Read more, should be encryption capabilities...
+  my $buf;
+  my $bytes_read = sysread($sock, $buf, 8192);
 
-    #print STDERR "BUFF: $buf\n";
+  #print STDERR "BUFF: $buf\n";
 
-    if (not defined $bytes_read) {
-		$self->_logger ('debug', 'DEBUG', "[SSH Check] Socket Error: $!") if $self->{'options'}->{'debug'};
-		$self->_set_errormsg ("[SSH Check] Socket Error: $!");
-		$sock->close;
-		return 0;
-	} elsif ($bytes_read == 0) {
-		$self->_logger ('debug', 'DEBUG', '[SSH Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
-		$self->_set_errormsg ('[SSH Check] Remote host closed connection.');
-		$sock->close;
-		return 0;
-	}
+  if (not defined $bytes_read) {
+    $self->_logger('debug', 'DEBUG', "[SSH Check] Socket Error: $!") if $self->{'options'}->{'debug'};
+    $self->_set_errormsg("[SSH Check] Socket Error: $!");
+    $sock->close;
+    return 0;
+  } elsif ($bytes_read == 0) {
+    $self->_logger('debug', 'DEBUG', '[SSH Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
+    $self->_set_errormsg('[SSH Check] Remote host closed connection.');
+    $sock->close;
+    return 0;
+  }
 
-	# Found working SSH server. Sometimes doesn't work if host closes the
-	# connection after the key exchange, maybe we need to get the login
-	# prompt, but that's for another day...
-	#
-	$self->_logger ('debug', 'DEBUG', '[SSH Check] Found SSH running on this device.') if $self->{'options'}->{'debug'};
+  # Found working SSH server. Sometimes doesn't work if host closes the
+  # connection after the key exchange, maybe we need to get the login
+  # prompt, but that's for another day...
+  #
+  $self->_logger('debug', 'DEBUG', '[SSH Check] Found SSH running on this device.') if $self->{'options'}->{'debug'};
 
-	$sock->shutdown(2);
-	$sock->close;
+  $sock->shutdown(2);
+  $sock->close;
 
-	return 1;
+  return 1;
 
 }
 
@@ -716,58 +726,59 @@ Checks if Telnet is available on device.
 
 sub _check_telnet {
 
-	my $self = shift;
+  my $self = shift;
 
-	my $sock = IO::Socket::INET->new(	PeerAddr	=> $self->{'result'}->{'hostname'},
-										PeerPort	=> 23,
-										Proto		=> 'tcp',
-										Timeout		=> 4);
+  my $sock = IO::Socket::INET->new(
+    PeerAddr => $self->{'result'}->{'hostname'},
+    PeerPort => 23,
+    Proto    => 'tcp',
+    Timeout  => 4
+  );
 
-	unless ($sock) {
-		$self->_logger ('debug', 'DEBUG', "[Telnet Check] $!") if $self->{'options'}->{'debug'};
-		$self->_set_errormsg ($!);
-		return 0;
-	}
+  unless ($sock) {
+    $self->_logger('debug', 'DEBUG', "[Telnet Check] $!") if $self->{'options'}->{'debug'};
+    $self->_set_errormsg($!);
+    return 0;
+  }
 
-	$self->_logger ('debug', 'DEBUG', '[Telnet Check] Checking if telnet is available.') if $self->{'options'}->{'debug'};
+  $self->_logger('debug', 'DEBUG', '[Telnet Check] Checking if telnet is available.') if $self->{'options'}->{'debug'};
 
-	my $buf;
+  my $buf;
 
-	my $s = IO::Select->new($sock);
-	my @ready = $s->can_read(20);
+  my $s     = IO::Select->new($sock);
+  my @ready = $s->can_read(20);
 
-	if (!@ready) {
-		$self->_logger ('debug', 'DEBUG', "[Telnet Check] Failed can_read, seems we can't read anything from the telnet port") if $self->{'options'}->{'debug'};
-		$self->_set_errormsg ("[Telnet Check] Failed can_read, seems we can't read anything from the telnet port");
-		$sock->close;
-		return 0;
-	}
+  if (!@ready) {
+    $self->_logger('debug', 'DEBUG', "[Telnet Check] Failed can_read, seems we can't read anything from the telnet port") if $self->{'options'}->{'debug'};
+    $self->_set_errormsg("[Telnet Check] Failed can_read, seems we can't read anything from the telnet port");
+    $sock->close;
+    return 0;
+  }
 
-	my $bytes_read = sysread($sock, $buf, 1);
+  my $bytes_read = sysread($sock, $buf, 1);
 
-	$self->_logger ('debug', 'DEBUG', '[Telnet Check] Checking if telnet socket allows us to read a byte of data.') if $self->{'options'}->{'debug'};
+  $self->_logger('debug', 'DEBUG', '[Telnet Check] Checking if telnet socket allows us to read a byte of data.') if $self->{'options'}->{'debug'};
 
-	if (not defined $bytes_read) {
-		next if $! == EAGAIN || $! == EWOULDBLOCK;
-		$self->_logger ('debug', 'DEBUG', "[Telnet Check] Socket Error: $!") if $self->{'options'}->{'debug'};
-		$self->_set_errormsg ("[Telnet Check] Socket Error:" . $!);
-		$sock->close;
-		return 0;
-	} elsif ($bytes_read == 0) {
-		$self->_logger ('debug', 'DEBUG', '[Telnet Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
-		$self->_set_errormsg ("[Telnet Check] Remote host closed connection");
-		$sock->close;
-		return 0;
-	}
+  if (not defined $bytes_read) {
+    next if $! == EAGAIN || $! == EWOULDBLOCK;
+    $self->_logger('debug', 'DEBUG', "[Telnet Check] Socket Error: $!") if $self->{'options'}->{'debug'};
+    $self->_set_errormsg("[Telnet Check] Socket Error:" . $!);
+    $sock->close;
+    return 0;
+  } elsif ($bytes_read == 0) {
+    $self->_logger('debug', 'DEBUG', '[Telnet Check] Remote host closed connection.') if $self->{'options'}->{'debug'};
+    $self->_set_errormsg("[Telnet Check] Remote host closed connection");
+    $sock->close;
+    return 0;
+  }
 
-	$self->_logger ('debug', 'DEBUG', '[Telnet Check] Found Telnet running on this device.') if $self->{'options'}->{'debug'};
+  $self->_logger('debug', 'DEBUG', '[Telnet Check] Found Telnet running on this device.') if $self->{'options'}->{'debug'};
 
-	$sock->shutdown(2);
-	$sock->close;
+  $sock->shutdown(2);
+  $sock->close;
 
-	return 1;
+  return 1;
 }
-
 
 =head1 AUTHOR
 
@@ -858,4 +869,4 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =cut
 
-1; # End of Device::Discover
+1;    # End of Device::Discover
