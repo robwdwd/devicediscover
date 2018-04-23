@@ -386,10 +386,6 @@ sub logger {
 
   my $message;
 
-  my $time = gmtime;
-
-  my $dt = '[' . $time->datetime . '+00:00]';
-
   if ($device) {
 
     return 0 unless (ref($device) eq "HASH");
@@ -400,9 +396,9 @@ sub logger {
     $pre .= '[' . $device->{'os'} . '] '       if (defined $device->{'os'});
     $pre .= '[' . $device->{'protocol'} . '] ' if (defined $device->{'protocol'});
 
-    $message = sprintf("%s %-7s: %s%s\n", $dt, $tag, $pre, $msg);
+    $message = sprintf("%-7s: %s%s\n", $tag, $pre, $msg);
   } else {
-    $message = sprintf("%s %-7s: %s\n", $dt, $tag, $msg);
+    $message = sprintf("%-7s: %s\n", $tag, $msg);
   }
 
   $self->{'log'}->log(level => $level, message => $message);
