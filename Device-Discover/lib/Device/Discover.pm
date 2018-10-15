@@ -363,7 +363,7 @@ sub discover {
   };
 
   if ($self->{'options'}->{'find_community'}) {
-    unless ($self->get_community()) {
+    unless ($self->get_community() or defined($self->{'options'}->{'snmpusername'})) {
       $self->{'has_error'} = 1;
       return 0;
     }
