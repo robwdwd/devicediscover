@@ -225,6 +225,7 @@ sub get_sysdesc {
             my $line = $result->{$sysDesc} . " " . $result->{$lldpDesc};
 
             $self->{'result'}->{'sysdesc'} = $line;
+            $self->{'result'}->{'snmp_version'} = '2';
             $line =~ s/\r|\n/ /g;
             $self->_logger('debug', "[SNMP] [v2c] [$line]") if $self->{'options'}->{'debug'} >= 2;
 
@@ -272,6 +273,7 @@ sub get_sysdesc {
                 my $line = $result->{$sysDesc} . " " . $result->{$lldpDesc};
 
                 $self->{'result'}->{'sysdesc'} = $line;
+                $self->{'result'}->{'snmp_version'} = '3';
                 $line =~ s/\r|\n/ /g;
                 $self->_logger('debug', "[SNMP] [v3] [$line]") if $self->{'options'}->{'debug'} >= 2;
 
