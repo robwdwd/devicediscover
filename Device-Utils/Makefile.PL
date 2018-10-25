@@ -8,7 +8,7 @@ WriteMakefile(
     AUTHOR           => q{Rob Woodward <robwwd@gmail.com>},
     VERSION_FROM     => 'lib/Device/Utils.pm',
     ABSTRACT_FROM    => 'lib/Device/Utils.pm',
-    LICENSE          => 'Artistic_2_0',
+    LICENSE          => 'Artistic2',
     PL_FILES         => {},
     MIN_PERL_VERSION => 5.010,
     CONFIGURE_REQUIRES => {
