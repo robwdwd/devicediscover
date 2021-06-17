@@ -168,8 +168,10 @@ sub parse_sysdesc {
     return 'TiMOS'   if ($descr =~ m/TiMOS/);
     return 'VRP'     if ($descr =~ m/Huawei/);
     return 'ArbOS'   if ($descr =~ m/Peakflow/i);
+    return 'ArbOS'   if ($descr =~ m/Arbor/i);
     return 'IOS-XE'  if ($descr =~ m/IOS-XE/);
     return 'IOS-XR'  if ($descr =~ m/IOS XR/);
+    return 'NX-OS'  if ($descr =~ m/NX-OS/);
     return 'IOS'     if ($descr =~ m/IOS/);
     return 'CatOS'   if ($descr =~ m/catalyst/i);
     return 'css'     if ($descr =~ m/Content Switch SW/);
