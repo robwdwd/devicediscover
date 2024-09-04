@@ -207,42 +207,10 @@ sub get_sysdesc {
         $community = $self->{'result'}->{'community'};
     }
 
-    # First try SNMP v2c
-
-    $self->_logger('debug', "[SNMP] Trying SNMP v2c") if $self->{'options'}->{'debug'};
-
-    ($session, $error) = Net::SNMP->session(
-        Hostname  => $self->{'options'}->{'hostname'},
-        Version   => 2,
-        Community => $community,
-        Timeout   => $self->{'options'}->{'snmptimeout'}
-    );
-
-    if (defined $session) {
-        my $result = $session->get_request(Varbindlist => [ $sysDesc, $lldpDesc ]);
-
-        if (defined($result)) {
-            $session->close;
-
-            my $line = $result->{$sysDesc} . " " . $result->{$lldpDesc};
-
-            $self->{'result'}->{'sysdesc'} = $line;
-            $self->{'result'}->{'snmp_version'} = '2';
-            $line =~ s/\r|\n/ /g;
-            $self->_logger('debug', "[SNMP] [v2c] [$line]") if $self->{'options'}->{'debug'} >= 2;
-
-            return 1;
-        } else {
-            $self->_logger('debug', '[SNMP] [v2c] ' . $session->error) if $self->{'options'}->{'debug'};
-        }
-        $session->close;
-    } else {
-        $self->_logger('debug', '[SNMP] [v2c] ' . $error) if $self->{'options'}->{'debug'};
-    }
 
     if (defined($self->{'options'}->{'snmpusername'}) and defined($self->{'options'}->{'snmppassword'})) {
 
-        # Now try SNMPv3
+        # Try SNMPv3
 
         $self->_logger('debug', "[SNMP] Trying SNMP v3") if $self->{'options'}->{'debug'};
 
@@ -291,6 +259,40 @@ sub get_sysdesc {
         }
 
     }
+
+    # Now try SNMP v2c
+
+    $self->_logger('debug', "[SNMP] Trying SNMP v2c") if $self->{'options'}->{'debug'};
+
+    ($session, $error) = Net::SNMP->session(
+        Hostname  => $self->{'options'}->{'hostname'},
+        Version   => 2,
+        Community => $community,
+        Timeout   => $self->{'options'}->{'snmptimeout'}
+    );
+
+    if (defined $session) {
+        my $result = $session->get_request(Varbindlist => [ $sysDesc, $lldpDesc ]);
+
+        if (defined($result)) {
+            $session->close;
+
+            my $line = $result->{$sysDesc} . " " . $result->{$lldpDesc};
+
+            $self->{'result'}->{'sysdesc'} = $line;
+            $self->{'result'}->{'snmp_version'} = '2';
+            $line =~ s/\r|\n/ /g;
+            $self->_logger('debug', "[SNMP] [v2c] [$line]") if $self->{'options'}->{'debug'} >= 2;
+
+            return 1;
+        } else {
+            $self->_logger('debug', '[SNMP] [v2c] ' . $session->error) if $self->{'options'}->{'debug'};
+        }
+        $session->close;
+    } else {
+        $self->_logger('debug', '[SNMP] [v2c] ' . $error) if $self->{'options'}->{'debug'};
+    }
+
 
     $self->_set_errormsg('[SNMP] Unable to connect to device with SNMP.');
 
